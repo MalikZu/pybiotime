@@ -2,7 +2,7 @@
 
 Typed Python client for the ZKTeco BioTime REST API.
 
-> **Status: in design.** Nothing is published yet.
+> **Status: early development.** Nothing is published yet.
 >
 > pybiotime is an unofficial project. It is not affiliated with or endorsed by ZKTeco.
 
@@ -14,6 +14,10 @@ Typed Python client for the ZKTeco BioTime REST API.
 - Automatic pagination, typed models and clear errors.
 - An in-memory fake server for testing code that uses pybiotime.
 - Python 3.10 to 3.14.
+
+## Contributing
+
+See [docs/contributing.md](docs/contributing.md).
 
 ## License
 
