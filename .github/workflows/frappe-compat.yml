@@ -1,0 +1,52 @@
+name: Frappe compatibility
+
+# Frappe benches install apps with uv, which silently replaces a conflicting
+# pinned version instead of failing. So a dependency range that drifts outside
+# Frappe's pins breaks users without any error. Resolve against each Frappe
+# branch's own dependency list, then run the tests on the versions it picks.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/frappe-compat.yml
+      - .github/scripts/frappe_requirements.py
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Frappe ${{ matrix.branch }} on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: version-15
+            python: "3.10"
+          - branch: version-15
+            python: "3.11"
+          - branch: version-16
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Fetch Frappe's dependencies
+        run: uv run --no-project --python 3.12 python .github/scripts/frappe_requirements.py ${{ matrix.branch }} > frappe.txt
+      - name: Resolve pybiotime together with Frappe
+        run: uv pip compile --python-version ${{ matrix.python }} frappe.txt pyproject.toml -o resolved.txt
+      - name: Test on the resolved versions
+        run: |
+          uv venv
+          uv pip install -e . pytest -c resolved.txt
+          grep -E '^(httpx|pydantic)==' resolved.txt
+          uv run --no-sync pytest
