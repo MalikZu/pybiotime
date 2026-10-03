@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10"
+      - run: uv sync --locked
+      - run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  commits:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - name: Check each commit follows Conventional Commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          status=0
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            git log -1 --format=%B "$sha" > msg.txt
+            if ! uvx pre-commit run conventional-pre-commit --hook-stage commit-msg \
+                --commit-msg-filename msg.txt > /dev/null; then
+              echo "::error::$(git log -1 --format='%h %s' "$sha")"
+              status=1
+            fi
+          done
+          exit $status
+
+  test:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python: "3.14"
+          - os: macos-latest
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked
+      - run: uv run pytest --cov --cov-report=term-missing
+
+  lowest:
+    name: Lowest allowed dependencies
+    runs-on: ubuntu-latest
+    env:
+      # Every uv command must see this, or it re-locks at the latest versions.
+      UV_RESOLUTION: lowest-direct
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          # The oldest pydantic we allow has no wheels for newer Pythons.
+          python-version: "3.10"
+      # uv keeps versions already in the lockfile, so resolve from scratch.
+      - run: rm uv.lock && uv sync
+      - run: uv run python -c "import httpx, pydantic; print(httpx.__version__, pydantic.VERSION)"
+      - run: uv run pytest
+
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv build
+      - name: Smoke-test the wheel in a clean environment
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import pybiotime; print(pybiotime.__version__)"
