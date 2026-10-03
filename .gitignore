@@ -1,0 +1,28 @@
+# Private maintainer notes, research and vendor manuals. Never commit.
+internal/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.env
+.env.*
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Docs build output
+site/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
