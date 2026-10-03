@@ -88,6 +88,14 @@ jobs:
       - run: uv run python -c "import httpx, pydantic; print(httpx.__version__, pydantic.VERSION)"
       - run: uv run pytest
 
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --locked --group docs mkdocs build --strict
+
   build:
     name: Build distributions
     runs-on: ubuntu-latest

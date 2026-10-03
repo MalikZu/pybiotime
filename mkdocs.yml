@@ -1,0 +1,29 @@
+site_name: pybiotime
+site_description: Unofficial typed Python client for the ZKTeco BioTime REST API.
+strict: true
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Contributing: contributing.md
