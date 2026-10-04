@@ -119,9 +119,10 @@ class AsyncCodedResource(Generic[M]):
         object_id: int | None = None,
     ) -> M:
         body = await self._client._request(method, path, json=json)
-        if saved_object(body):
-            return build_model(self.model, body, timezone=self._client.timezone, path=path)
-        # BioTime 9.5 answers some writes without the object's id, so read it back.
+        # Write answers are not shaped like reads: relations come as bare ids, and
+        # BioTime 9.5 leaves the id out of some. So read the saved object back.
+        if object_id is None and saved_object(body):
+            object_id = body["id"]
         found = await self.get(object_id) if object_id is not None else None
         if found is None and code is not None:
             found = await self.get_by_code(code)
@@ -378,9 +379,10 @@ class AsyncEmployees:
         employee_id: int | None = None,
     ) -> Employee:
         body = await self._client._request(method, path, json=json)
-        if saved_object(body):
-            return build_model(Employee, body, timezone=self._client.timezone, path=path)
-        # BioTime 9.5 answers some writes without the object's id, so read it back.
+        # Write answers are not shaped like reads: relations come as bare ids, and
+        # BioTime 9.5 leaves the id out of some. So read the saved object back.
+        if employee_id is None and saved_object(body):
+            employee_id = body["id"]
         found = await self.get(employee_id) if employee_id is not None else None
         if found is None and emp_code is not None:
             found = await self.get_by_code(emp_code)
@@ -479,9 +481,9 @@ class AsyncResigns:
         resign_id: int | None = None,
     ) -> Resign:
         body = await self._client._request(method, path, json=json)
-        if saved_object(body):
-            return build_model(Resign, body, timezone=self._client.timezone, path=path)
-        # BioTime 9.5 answers some writes without the object's id, so read it back.
+        # Read the saved object back, as for employees: write answers are shaped differently.
+        if resign_id is None and saved_object(body):
+            resign_id = body["id"]
         if resign_id is not None:
             return await self.get(resign_id)
         newest: Resign | None = None

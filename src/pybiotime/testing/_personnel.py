@@ -175,7 +175,10 @@ class PersonnelData:
             status = 200
         if kind == "employees":
             row["update_time"] = datetime.now().strftime(_FORMAT)
-        return httpx.Response(status, json=self._render(kind, row))
+        if kind == "resigns":
+            return httpx.Response(status, json=self._render(kind, row))
+        # Other write answers give relations as bare ids, as the vendor manuals show.
+        return httpx.Response(status, json={k: v for k, v in row.items() if k not in _WRITE_ONLY})
 
     def _validate(
         self, kind: str, data: dict[str, Any], current: dict[str, Any] | None

@@ -115,6 +115,7 @@ class TestEmployees:
             found = client.employees.get_by_code("1001")
         assert found is not None
         assert found.id == created.id
+        assert created.attendance is not None
         assert found.department_id == dept_id(fake, "OPS")
         assert found.area_ids == [area_id(fake, "1")]
         assert found.hire_date == date(2026, 10, 1)
