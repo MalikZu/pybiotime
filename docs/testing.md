@@ -54,6 +54,8 @@ that must exist. Failures raise `BadRequestError` with `field_errors`, as on a r
 - `fake.fail_next(503, path="/iclock/")` answers the next matching request with an error.
 - `fake.tokens.clear()` makes the server reject the current token.
 - `upload_time=` on `add_transaction` imitates a device that uploads late.
+- `fake.creates_without_id` lists the collections whose creates answer without the new id.
+  It defaults to `{"positions"}`, as BioTime 9.5 does.
 - `fake.after_request` is called with each request after it is answered. Use it to add
   punches while your code is paging, as devices do on a live server:
 
