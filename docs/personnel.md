@@ -44,6 +44,8 @@ emp = bt.employees.upsert(
 - **BioTime requires a department and at least one area** when creating an employee.
 - **`upsert`** creates the employee, or sends only the fields that differ from what the
   server has. Run it on every sync: when nothing changed, it sends nothing.
+- **Fields the server never sends back**, such as `self_password`, cannot be compared.
+  `upsert` sets them when it creates the employee. Use `update` to change them later.
 - **`update`** changes only the arguments you pass. To clear a field, pass it in `fields`,
   for example `fields={"position": None}`.
 - **Other fields**, including custom attributes, go in `fields` under their API name:

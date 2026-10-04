@@ -327,7 +327,8 @@ class AsyncEmployees:
         """Create the employee, or bring the existing one with this code up to date.
 
         Only fields that differ are sent, so running it again changes nothing. ``None``
-        arguments leave the existing value alone.
+        arguments leave the existing value alone. Fields the server does not send back,
+        such as ``self_password``, are set only when the employee is created.
         """
         desired = employee_payload(
             emp_code=emp_code,
