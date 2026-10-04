@@ -44,7 +44,9 @@ def resolve_timezone(value: str | tzinfo | None) -> tzinfo | None:
         return ZoneInfo(value)
     except ZoneInfoNotFoundError:
         raise ValueError(
-            f"Unknown timezone {value!r}. Use an IANA name such as 'Asia/Dubai'."
+            f"Unknown timezone {value!r}. Use an IANA name such as 'Asia/Dubai'. "
+            "If the name is right, this system has no timezone data: install the "
+            "'tzdata' package."
         ) from None
 
 

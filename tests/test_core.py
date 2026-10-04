@@ -184,8 +184,10 @@ class TestDatetimes:
             format_datetime(value, None)
 
     def test_unknown_timezone(self) -> None:
-        with pytest.raises(ValueError, match="Unknown timezone"):
+        with pytest.raises(ValueError, match="Unknown timezone") as caught:
             resolve_timezone("Mars/Olympus")
+        # The name may be right on a system without timezone data, so say how to get it.
+        assert "tzdata" in str(caught.value)
 
 
 def test_merge_params_drops_none() -> None:
