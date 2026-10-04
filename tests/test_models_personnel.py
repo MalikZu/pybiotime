@@ -54,6 +54,10 @@ class TestEmployee:
         )
         assert "enable_att" not in emp.extra
 
+    def test_can_be_hashed(self) -> None:
+        emp = Employee.model_validate(employee("9.5"))
+        assert hash(emp) == hash(Employee.model_validate(employee("9.5")))
+
     @pytest.mark.parametrize("version", ["9.5", "8.0"])
     def test_secrets_stay_out_of_repr(self, version: str) -> None:
         emp = Employee.model_validate(employee(version))
@@ -69,7 +73,7 @@ class TestEmployee:
 
     def test_missing_area(self) -> None:
         payload = employee("9.5") | {"area": None}
-        assert Employee.model_validate(payload).area == []
+        assert Employee.model_validate(payload).area == ()
 
     def test_no_attendance_flags(self) -> None:
         payload = employee("9.5")
