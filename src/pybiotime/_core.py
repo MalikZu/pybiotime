@@ -289,6 +289,14 @@ def _snippet(content: bytes) -> str:
 M = TypeVar("M", bound=BaseModel)
 
 
+def saved_object(body: Any) -> bool:
+    """Whether a write response holds the saved object, id included.
+
+    BioTime 9.5 answers some creates with the submitted fields only, without the id.
+    """
+    return isinstance(body, dict) and "id" in body
+
+
 def build_model(model: type[M], data: Any, *, timezone: tzinfo | None, path: str) -> M:
     """Validate one object from the server into `model`."""
     try:
