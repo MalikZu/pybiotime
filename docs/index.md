@@ -13,7 +13,8 @@ A typed Python client for the ZKTeco BioTime REST API.
 
 - Talks to BioTime 9.5. Support for 9.0 and 8.5 is planned where their APIs overlap.
 - Offers sync and async clients with the same methods.
-- Reads devices and punch transactions today. Employees, departments, areas and positions come next.
+- Reads devices and punch transactions.
+- [Manages employees](personnel.md), departments, areas and positions, and resigns and reinstates people.
 - Pages through results for you, returns typed models and raises clear errors.
 - [Collects new punches without gaps](punches.md#collect-new-punches-without-gaps),
   including late uploads from offline devices.
