@@ -1,0 +1,309 @@
+"""The personnel endpoints of `FakeBioTime`: departments, areas, positions, employees, resigns."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
+import httpx
+
+_FORMAT = "%Y-%m-%d %H:%M:%S"
+_ROOT = "/personnel/api/"
+
+
+@dataclass(frozen=True)
+class _Coded:
+    """How one code-and-name collection is spelled on the wire."""
+
+    code: str
+    name: str
+    parent: str
+    label: str
+    #: Whether responses carry a ``parent_*_name`` copy, as areas and positions do.
+    parent_name: bool
+
+
+_CODED = {
+    "departments": _Coded("dept_code", "dept_name", "parent_dept", "department", False),
+    "areas": _Coded("area_code", "area_name", "parent_area", "area", True),
+    "positions": _Coded("position_code", "position_name", "parent_position", "position", True),
+}
+
+_EMPLOYEE_TEXT = (
+    "first_name",
+    "last_name",
+    "nickname",
+    "contact_tel",
+    "office_tel",
+    "mobile",
+    "national",
+    "city",
+    "address",
+    "postcode",
+    "email",
+    "enroll_sn",
+    "ssn",
+    "religion",
+)
+
+
+@dataclass(kw_only=True)
+class PersonnelData:
+    """Personnel records held by the fake. Rows are stored as the API would accept them."""
+
+    departments: list[dict[str, Any]] = field(default_factory=list)
+    areas: list[dict[str, Any]] = field(default_factory=list)
+    positions: list[dict[str, Any]] = field(default_factory=list)
+    employees: list[dict[str, Any]] = field(default_factory=list)
+    resigns: list[dict[str, Any]] = field(default_factory=list)
+
+    def _new_id(self) -> int:
+        raise NotImplementedError
+
+    # --- data -------------------------------------------------------------------------
+
+    def add_department(self, *, code: str, name: str, parent_id: int | None = None) -> int:
+        return self._add_coded("departments", code, name, parent_id)
+
+    def add_area(self, *, code: str, name: str, parent_id: int | None = None) -> int:
+        return self._add_coded("areas", code, name, parent_id)
+
+    def add_position(self, *, code: str, name: str, parent_id: int | None = None) -> int:
+        return self._add_coded("positions", code, name, parent_id)
+
+    def add_employee(
+        self, *, emp_code: str, department_id: int, area_ids: list[int], **fields: Any
+    ) -> int:
+        new_id = self._new_id()
+        row = {
+            "id": new_id,
+            "emp_code": emp_code,
+            "department": department_id,
+            "area": list(area_ids),
+            "update_time": datetime.now().strftime(_FORMAT),
+            **fields,
+        }
+        self.employees.append(row)
+        return new_id
+
+    def _add_coded(self, kind: str, code: str, name: str, parent_id: int | None) -> int:
+        spec = _CODED[kind]
+        new_id = self._new_id()
+        row = {"id": new_id, spec.code: code, spec.name: name, spec.parent: parent_id}
+        getattr(self, kind).append(row)
+        return new_id
+
+    # --- HTTP -------------------------------------------------------------------------
+
+    def _personnel(
+        self, method: str, path: str, params: dict[str, str], body: Any
+    ) -> httpx.Response | None:
+        """Answer a ``/personnel/api/`` request, or ``None`` if the path is not one of ours."""
+        parts = path[len(_ROOT) :].strip("/").split("/")
+        kind, rest = parts[0], parts[1:]
+        if kind == "resigns" and rest == ["reinstatement"] and method == "POST":
+            return self._reinstate(body)
+        if kind not in (*_CODED, "employees", "resigns") or len(rest) > 1:
+            return None
+        rows: list[dict[str, Any]] = getattr(self, kind)
+        if not rest:
+            if method == "GET":
+                rendered = [self._render(kind, r) for r in self._filter(kind, params)]
+                return self._list(path, params, rendered)
+            if method == "POST":
+                return self._write(kind, None, body)
+            return _detail(405, f'Method "{method}" not allowed.')
+
+        row = next((r for r in rows if str(r["id"]) == rest[0]), None)
+        if row is None:
+            return _detail(404, "Not found.")
+        if method == "GET":
+            return httpx.Response(200, json=self._render(kind, row))
+        if method in ("PATCH", "PUT"):
+            return self._write(kind, row, body)
+        if method == "DELETE":
+            rows.remove(row)
+            return httpx.Response(204)
+        return _detail(405, f'Method "{method}" not allowed.')
+
+    def _list(
+        self, path: str, params: dict[str, str], rows: list[dict[str, Any]]
+    ) -> httpx.Response:
+        raise NotImplementedError
+
+    def _filter(self, kind: str, params: dict[str, str]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = list(getattr(self, kind))
+        if kind in _CODED:
+            spec = _CODED[kind]
+            keys = {spec.code: spec.code, spec.name: spec.name, spec.parent: spec.parent}
+        elif kind == "employees":
+            keys = {
+                k: k for k in ("emp_code", "first_name", "last_name", "department", "app_status")
+            }
+            rows.sort(key=lambda r: str(r["emp_code"]))
+        else:
+            keys = {"employee": "employee", "resign_type": "resign_type"}
+        for param, key in keys.items():
+            if param in params:
+                rows = [r for r in rows if str(r.get(key)) == params[param]]
+        return rows
+
+    # --- writes -----------------------------------------------------------------------
+
+    def _write(self, kind: str, row: dict[str, Any] | None, body: Any) -> httpx.Response:
+        if not isinstance(body, dict):
+            return httpx.Response(400, json={"non_field_errors": ["Invalid data."]})
+        merged = {**(row or {}), **body}
+        errors = self._validate(kind, merged, row)
+        if errors:
+            return httpx.Response(400, json=errors)
+        if row is None:
+            row = {"id": self._new_id(), **body}
+            getattr(self, kind).append(row)
+            status = 201
+        else:
+            row.update(body)
+            status = 200
+        if kind == "employees":
+            row["update_time"] = datetime.now().strftime(_FORMAT)
+        return httpx.Response(status, json=self._render(kind, row))
+
+    def _validate(
+        self, kind: str, data: dict[str, Any], current: dict[str, Any] | None
+    ) -> dict[str, list[str]]:
+        errors: dict[str, list[str]] = {}
+        required: tuple[str, ...]
+        if kind in _CODED:
+            spec = _CODED[kind]
+            required = (spec.code, spec.name)
+            unique = spec.code
+            references = {spec.parent: kind}
+        elif kind == "employees":
+            required = ("emp_code", "department", "area")
+            unique = "emp_code"
+            references = {"department": "departments", "position": "positions"}
+            areas = data.get("area")
+            if isinstance(areas, list):
+                known = {a["id"] for a in self.areas}
+                missing = [a for a in areas if a not in known]
+                if missing:
+                    errors["area"] = [f'Invalid pk "{missing[0]}" - object does not exist.']
+        else:
+            required = ("employee",)
+            unique = "employee"
+            references = {"employee": "employees"}
+
+        for key in required:
+            if data.get(key) in (None, "", []):
+                errors[key] = ["This field is required."]
+        clash = [
+            r
+            for r in getattr(self, kind)
+            if r.get(unique) == data.get(unique) and (current is None or r["id"] != current["id"])
+        ]
+        if clash and unique not in errors:
+            label = _CODED[kind].label if kind in _CODED else kind.rstrip("s")
+            errors[unique] = [f"{label} with this {unique} already exists."]
+        for key, target in references.items():
+            value = data.get(key)
+            if value is not None and not any(r["id"] == value for r in getattr(self, target)):
+                errors[key] = [f'Invalid pk "{value}" - object does not exist.']
+        return errors
+
+    def _reinstate(self, body: Any) -> httpx.Response:
+        ids = body.get("resigns") if isinstance(body, dict) else None
+        if not isinstance(ids, list) or not ids:
+            return httpx.Response(400, json={"resigns": ["This field is required."]})
+        self.resigns = [r for r in self.resigns if r["id"] not in ids]
+        return httpx.Response(200, json={"code": 0, "msg": "", "data": []})
+
+    # --- rendering, in the BioTime 9.5 shape -------------------------------------------
+
+    def _render(self, kind: str, row: dict[str, Any]) -> dict[str, Any]:
+        if kind in _CODED:
+            return self._render_coded(kind, row)
+        if kind == "employees":
+            return self._render_employee(row)
+        return self._render_resign(row)
+
+    def _render_coded(self, kind: str, row: dict[str, Any], depth: int = 0) -> dict[str, Any]:
+        spec = _CODED[kind]
+        parent_id = row.get(spec.parent)
+        parent = next((r for r in getattr(self, kind) if r["id"] == parent_id), None)
+        rendered: dict[str, Any] = {
+            "id": row["id"],
+            spec.code: row[spec.code],
+            spec.name: row[spec.name],
+        }
+        if depth:
+            rendered[spec.parent] = parent_id
+            return rendered
+        rendered[spec.parent] = self._render_coded(kind, parent, depth + 1) if parent else None
+        if spec.parent_name:
+            rendered[f"{spec.parent}_name"] = parent[spec.name] if parent else None
+        return rendered
+
+    def _render_employee(self, row: dict[str, Any]) -> dict[str, Any]:
+        def ref(kind: str, object_id: Any) -> dict[str, Any] | None:
+            spec = _CODED[kind]
+            match = next((r for r in getattr(self, kind) if r["id"] == object_id), None)
+            if match is None:
+                return None
+            return {"id": match["id"], spec.code: match[spec.code], spec.name: match[spec.name]}
+
+        rendered: dict[str, Any] = {"id": row["id"], "emp_code": row["emp_code"]}
+        rendered.update({key: row.get(key, "") for key in _EMPLOYEE_TEXT})
+        rendered.update(
+            {
+                "format_name": f"{row['emp_code']} {row.get('first_name', '')}".strip(),
+                "full_name": f"{row.get('first_name', '')} {row.get('last_name', '')}".strip(),
+                "photo": "",
+                "device_password": row.get("device_password"),
+                "card_no": row.get("card_no"),
+                "department": ref("departments", row.get("department")),
+                "position": ref("positions", row.get("position")),
+                "hire_date": row.get("hire_date", datetime.now().date().isoformat()),
+                "gender": row.get("gender"),
+                "birthday": row.get("birthday"),
+                "verify_mode": row.get("verify_mode", 0),
+                "emp_type": row.get("emp_type"),
+                "attemployee": {
+                    "id": row["id"],
+                    "enable_attendance": True,
+                    "enable_overtime": True,
+                    "enable_holiday": True,
+                    "enable_schedule": True,
+                },
+                "dev_privilege": row.get("dev_privilege", 0),
+                "area": [ref("areas", a) for a in row.get("area", [])],
+                "app_status": row.get("app_status", 0),
+                "app_role": row.get("app_role", 1),
+                "update_time": row.get("update_time"),
+            }
+        )
+        rendered.update({k: v for k, v in row.items() if k not in rendered})
+        return rendered
+
+    def _render_resign(self, row: dict[str, Any]) -> dict[str, Any]:
+        employee = next((e for e in self.employees if e["id"] == row["employee"]), {})
+        person = {
+            "id": row["employee"],
+            "emp_code": employee.get("emp_code"),
+            "first_name": employee.get("first_name", ""),
+            "last_name": employee.get("last_name", ""),
+        }
+        return {
+            "id": row["id"],
+            "resign_date": row.get("resign_date"),
+            "resign_type": row.get("resign_type"),
+            "disableatt": row.get("disableatt"),
+            "employee": person,
+            "first_name": person["first_name"],
+            "last_name": person["last_name"],
+            "reason": row.get("reason", ""),
+        }
+
+
+def _detail(status: int, message: str) -> httpx.Response:
+    return httpx.Response(status, json={"detail": message})
