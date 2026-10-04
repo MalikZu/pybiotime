@@ -20,6 +20,7 @@ from pybiotime.errors import (
     ServerError,
     TransportError,
 )
+from pybiotime.incremental import ReadResult, ReadStateError
 from pybiotime.models import Terminal, Transaction
 from pybiotime.pagination import Page
 
@@ -42,6 +43,8 @@ __all__ = [
     "PaginationError",
     "PermissionDeniedError",
     "PunchState",
+    "ReadResult",
+    "ReadStateError",
     "ResponseShapeError",
     "ServerError",
     "StaffJWTAuth",

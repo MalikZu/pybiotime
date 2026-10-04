@@ -65,6 +65,20 @@ class Pager(Generic[T]):
                 return
             params = raw.next_params
 
+    def first_page(self) -> Page[T]:
+        """Fetch only the first page."""
+        params = {**self._params, "page_size": str(self._page_size)}
+        raw = parse_page(
+            self._client._request("GET", self._path, params=params),
+            method="GET",
+            path=self._path,
+        )
+        return Page(
+            items=[self._parse(item) for item in raw.items],
+            count=raw.count,
+            has_next=raw.next_params is not None,
+        )
+
     def first(self) -> T | None:
         """Fetch only the first matching object, or ``None`` if there is none."""
         raw = self._small_page()

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Mapping
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from pybiotime._core import build_model, format_datetime, merge_params
+from pybiotime._sync.incremental import read_new as _read_new
 from pybiotime._sync.pagination import Pager
+from pybiotime.incremental import ReadResult
 from pybiotime.models import Terminal, Transaction
 from pybiotime.models.transaction import TransactionOrder
 
@@ -101,6 +104,34 @@ class Transactions:
             self._client._request("GET", path),
             timezone=self._client.timezone,
             path=path,
+        )
+
+    def read_new(
+        self,
+        state: Mapping[str, Any] | None = None,
+        *,
+        start: datetime | None = None,
+        lookback: timedelta = timedelta(days=1),
+        overlap: timedelta = timedelta(minutes=30),
+        page_size: int | None = None,
+    ) -> ReadResult:
+        """Return the punches that arrived since the last call, including late uploads.
+
+        Store `result.state` (a small JSON-serialisable dict) and pass it back next time.
+        Without a state, this returns every punch from `start` on, or all of them.
+
+        Two scans run, and only punches not returned before are kept:
+
+        1. Newest arrivals first, back to the previous run's newest arrival minus
+           `overlap`. This finds punches that offline devices upload late, however old.
+        2. Punch times from `lookback` before the newest arrival. This is a safety net
+           for servers that do not sort by arrival time.
+
+        A punch can still be returned twice in rare cases, so key your storage on
+        the server and the transaction `id`.
+        """
+        return _read_new(
+            self, state, start=start, lookback=lookback, overlap=overlap, page_size=page_size
         )
 
     def _parse(self, item: dict[str, Any]) -> Transaction:
