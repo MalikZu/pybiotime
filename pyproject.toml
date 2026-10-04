@@ -59,6 +59,9 @@ select = ["F", "E", "W", "I", "UP", "B", "RUF", "SIM", "PT", "S", "T20"]
 [tool.ruff.lint.per-file-ignores]
 # Tests use asserts and made-up credentials.
 "tests/**" = ["S101", "S105", "S106"]
+# Generated from async code, where these rewrites are not possible.
+"src/pybiotime/_sync/**" = ["UP028"]
+"tests/_sync/**" = ["S101", "S105", "S106", "SIM117"]
 
 [tool.mypy]
 python_version = "3.10"

@@ -36,6 +36,12 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: unasync
+        name: sync code matches async code
+        entry: uv run python scripts/unasync.py --check
+        language: system
+        files: (_async|_sync)/|scripts/unasync\.py
+        pass_filenames: false
       # internal/ is ignored by git, but `git add -f` would still stage it.
       - id: no-internal-files
         name: internal/ is never committed
