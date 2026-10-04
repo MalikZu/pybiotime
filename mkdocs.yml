@@ -26,4 +26,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting started: getting-started.md
+  - Authentication: authentication.md
+  - Reading punches: punches.md
+  - Errors: errors.md
+  - Testing your code: testing.md
   - Contributing: contributing.md
