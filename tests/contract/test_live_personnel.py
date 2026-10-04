@@ -5,18 +5,22 @@ BIOTIME_WRITE_TESTS=1: it creates a department, area, position and employee whos
 start with "PYBT", changes them, and deletes them again.
 """
 
-import contextlib
 import os
 import secrets
+import time
 from collections.abc import Iterator
 from datetime import date
 
 import pytest
 
-from pybiotime import BioTimeClient, NotFoundError, ResignType
+from pybiotime import BioTimeClient, BioTimeError, NotFoundError, ResignType
 from tests.contract.test_live import URL, live_auth
 
 pytestmark = pytest.mark.skipif(not URL, reason="BIOTIME_URL is not set")
+
+ROOT = "/personnel/api/"
+# What employees refer to, so it is deleted after them.
+CODED = (("departments", "dept_code"), ("areas", "area_code"), ("positions", "position_code"))
 
 
 @pytest.fixture(scope="module")
@@ -56,6 +60,8 @@ def test_resigns_read(client: BioTimeClient) -> None:
 )
 def test_round_trip(client: BioTimeClient) -> None:
     tag = "PYBT" + secrets.token_hex(3).upper()
+    employee_ids: list[int] = []
+    resign_ids: list[int] = []
     try:
         dept = client.departments.create(tag, f"{tag} department")
         area = client.areas.create(tag, f"{tag} area")
@@ -68,6 +74,7 @@ def test_round_trip(client: BioTimeClient) -> None:
         emp = client.employees.create(
             tag, department_id=dept.id, area_ids=[area.id], first_name="Test", last_name=tag
         )
+        employee_ids.append(emp.id)
         assert emp.department_id == dept.id
         assert emp.area_ids == [area.id]
 
@@ -83,21 +90,71 @@ def test_round_trip(client: BioTimeClient) -> None:
         resign = client.resigns.create(
             emp.id, resign_date=date.today(), resign_type=ResignType.QUIT, reason="pybiotime test"
         )
+        resign_ids.append(resign.id)
         assert resign.employee.id == emp.id
         client.resigns.reinstate([resign.id])
         assert all(r.id != resign.id for r in client.resigns.list(employee_id=emp.id))
     finally:
-        # Clean up by code, so records are removed even when a step failed before
-        # its id was known. Employees go first: they refer to the others.
-        employee = client.employees.get_by_code(tag)
-        if employee is not None:
-            client.employees.delete(employee.id)
-        for kind in ("departments", "areas", "positions"):
-            manager = getattr(client, kind)
-            leftover = manager.get_by_code(tag)
-            if leftover is not None:
-                with contextlib.suppress(NotFoundError):
-                    manager.delete(leftover.id)
-    assert client.employees.get_by_code(tag) is None
-    for kind in ("departments", "areas", "positions"):
-        assert getattr(client, kind).get_by_code(tag) is None
+        left = clean_up(client, tag, employee_ids, resign_ids)
+        assert not left, f"Delete these test records by hand: {left}"
+
+
+def clean_up(
+    client: BioTimeClient, tag: str, employee_ids: list[int], resign_ids: list[int]
+) -> list[str]:
+    """Delete what the round trip made, then return what is still there.
+
+    Every step runs even when an earlier one failed, and lookups read raw JSON, so a bug
+    in the code under test cannot stop the clean-up. Records are also found by code, in
+    case a step failed before their id was known.
+    """
+    employees = {*employee_ids, *ids(client, "employees", "emp_code", tag)}
+    resigns = {*resign_ids, *(r for e in employees for r in ids(client, "resigns", "employee", e))}
+    paths = [f"resigns/{r}/" for r in resigns] + [f"employees/{e}/" for e in employees]
+    paths += [f"{kind}/{i}/" for kind, key in CODED for i in ids(client, kind, key, tag)]
+    for path in paths:
+        delete(client, path)
+    left = {path for path in paths if exists(client, path)}
+    for kind, key in (("employees", "emp_code"), *CODED):
+        left.update(f"{kind}/{i}/" for i in ids(client, kind, key, tag))
+    return sorted(left)
+
+
+def ids(client: BioTimeClient, kind: str, key: str, value: object) -> list[int]:
+    """Ids of the records whose `key` is exactly `value`. Empty if the server fails."""
+    params = {key: str(value), "page_size": "100"}
+    try:
+        body = client._request("GET", f"{ROOT}{kind}/", params=params)
+    except BioTimeError:
+        return []
+    found = []
+    for row in body.get("data", []) if isinstance(body, dict) else []:
+        field = row.get(key)
+        if isinstance(field, dict):
+            field = field.get("id")
+        if str(field) == str(value):
+            found.append(row["id"])
+    return found
+
+
+def delete(client: BioTimeClient, path: str) -> None:
+    # The client does not retry deletes, so retry here.
+    for attempt in range(3):
+        try:
+            client._request("DELETE", ROOT + path)
+            return
+        except NotFoundError:
+            return
+        except BioTimeError:
+            if attempt < 2:
+                time.sleep(2)
+
+
+def exists(client: BioTimeClient, path: str) -> bool:
+    try:
+        client._request("GET", ROOT + path)
+    except NotFoundError:
+        return False
+    except BioTimeError:
+        return True  # Cannot tell, so report it.
+    return True
