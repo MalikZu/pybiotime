@@ -252,3 +252,13 @@ async def test_employee_and_resign_without_id_in_the_answer(fake: FakeBioTime) -
         )
     assert emp.id == fake.employees[0]["id"]
     assert resign.id == fake.resigns[0]["id"]
+
+
+@pytest.mark.anyio
+async def test_spaces_around_codes_do_not_count(fake: FakeBioTime) -> None:
+    async with client_for(fake) as client:
+        position = await client.positions.create("NEW ", "New one")
+        ops = await client.departments.upsert(" OPS ", "Operations ")
+    assert position.position_code == "NEW"
+    assert ops.id == dept_id(fake, "OPS")
+    assert writes(fake, "PATCH") == 0

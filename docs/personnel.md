@@ -23,6 +23,7 @@ bt.departments.update(ops.id, name="Operations team")
   to the devices in that area.
 - **`upsert(code, name)`** creates the object if no object has that code. Otherwise it updates the name,
   and the parent if you pass `parent_id`. It sends a change only when something differs.
+- **Spaces around codes** are trimmed before a code is sent or looked up.
 
 ## Employees
 
