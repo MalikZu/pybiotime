@@ -26,6 +26,10 @@ dependencies = [
     "pydantic>=2.6,<3",
 ]
 
+[project.urls]
+Source = "https://github.com/MalikZu/pybiotime"
+Issues = "https://github.com/MalikZu/pybiotime/issues"
+
 [dependency-groups]
 dev = [
     "mypy>=1.13",

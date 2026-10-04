@@ -1,6 +1,7 @@
 site_name: pybiotime
 site_description: Unofficial typed Python client for the ZKTeco BioTime REST API.
 strict: true
+repo_url: https://github.com/MalikZu/pybiotime
 
 theme:
   name: material
