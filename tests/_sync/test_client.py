@@ -244,3 +244,10 @@ def test_repr_hides_secrets(fake: FakeBioTime) -> None:
     client = client_for(fake, auth=TokenAuth("api", "hunter2"))
     assert "hunter2" not in repr(client)
     assert "biotime.test" in repr(client)
+
+
+def test_ca_bundle_path_is_accepted(fake: FakeBioTime) -> None:
+    import certifi
+
+    client = client_for(fake, verify=certifi.where())
+    assert "biotime.test" in repr(client)

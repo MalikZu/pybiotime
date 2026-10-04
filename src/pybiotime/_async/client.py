@@ -72,6 +72,9 @@ class AsyncBioTimeClient:
         self.page_size = page_size
         self.retries = retries
         self.login_cooldown = login_cooldown
+        if isinstance(verify, str):
+            # httpx deprecates a CA path here; it wants an SSL context.
+            verify = ssl.create_default_context(cafile=verify)
         self._login_lock = AsyncLock()
         self._http = httpx.AsyncClient(
             base_url=base_url,
