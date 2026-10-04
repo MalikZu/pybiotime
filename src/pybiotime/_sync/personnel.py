@@ -189,7 +189,8 @@ class Employees:
                 "first_name": first_name,
                 "last_name": last_name,
                 "department": department_id,
-                "app_status": app_status,
+                # BioTime takes 1 or 0, and rejects true and false.
+                "app_status": int(app_status) if app_status is not None else None,
             }
         )
         return Pager(self._client, self.path, params, self._parse, page_size)
