@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pybiotime.models._base import (
     BioTimeDateTime,
     BioTimeModel,
@@ -10,7 +12,11 @@ from pybiotime.models._base import (
     OptionalDateTime,
 )
 
-__all__ = ["Transaction"]
+__all__ = ["Transaction", "TransactionOrder"]
+
+#: Sort orders the server honours for transactions. It silently ignores any other value,
+#: so the choice is closed. Without one, BioTime 9.5 returns ascending ids.
+TransactionOrder = Literal["punch_time", "-punch_time", "upload_time", "-upload_time"]
 
 
 class Transaction(BioTimeModel):

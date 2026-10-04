@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import logging
+import random
+import ssl
+import time
+from datetime import tzinfo
+from types import TracebackType
+from typing import Any
+
+import httpx
+
+from pybiotime._async.resources import AsyncTerminals, AsyncTransactions
+from pybiotime._concurrency import AsyncLock, async_sleep
+from pybiotime._core import decode_response, resolve_timezone
+from pybiotime._version import __version__
+from pybiotime.auth import Auth
+from pybiotime.errors import (
+    APIError,
+    AuthenticationError,
+    LoginSuspendedError,
+    TransportError,
+)
+
+__all__ = ["AsyncBioTimeClient"]
+
+logger = logging.getLogger("pybiotime")
+
+_RETRY_STATUSES = frozenset({502, 503, 504})
+
+
+class AsyncBioTimeClient:
+    """Client for one BioTime server.
+
+    Args:
+        base_url: Server address with scheme and port, for example ``"http://10.0.0.5:8090"``.
+        auth: How to authenticate, for example ``TokenAuth("api_user", "secret")``.
+        timezone: The server's timezone, as a name such as ``"Asia/Dubai"`` or a `tzinfo`.
+            BioTime timestamps carry no timezone. When this is set, returned timestamps get
+            it attached and aware datetimes in filters are converted to it.
+        timeout: Seconds to wait for each response. The first request after the server
+            has been idle can be slow, hence the generous default.
+        verify: TLS certificate check. ``False`` accepts the self-signed certificate many
+            BioTime servers use; a path or `ssl.SSLContext` trusts a specific CA.
+        page_size: Objects per page when listing.
+        retries: How often to retry a GET after a network error or HTTP 502, 503 or 504.
+            Other methods are never retried.
+        login_cooldown: Seconds to wait before logging in again after the server rejected
+            the credentials, so a wrong password does not lock the account.
+        transport: An httpx transport, for testing. See `pybiotime.testing`.
+
+    Use it as a context manager, or call `aclose()` when done.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        auth: Auth,
+        timezone: str | tzinfo | None = None,
+        timeout: float = 60.0,
+        verify: bool | str | ssl.SSLContext = True,
+        page_size: int = 100,
+        retries: int = 2,
+        login_cooldown: float = 60.0,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+        self.auth = auth
+        self.timezone = resolve_timezone(timezone)
+        self.page_size = page_size
+        self.retries = retries
+        self.login_cooldown = login_cooldown
+        self._login_lock = AsyncLock()
+        self._http = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=timeout,
+            verify=verify,
+            transport=transport,
+            follow_redirects=False,
+            headers={
+                "Accept": "application/json",
+                # Display fields such as punch_state_display follow this language.
+                "Accept-Language": "en",
+                "User-Agent": f"pybiotime/{__version__}",
+            },
+        )
+        self.terminals = AsyncTerminals(self)
+        self.transactions = AsyncTransactions(self)
+
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+    ) -> Any:
+        """Call any endpoint and return the decoded JSON.
+
+        Use this for endpoints pybiotime does not wrap yet. Authentication, retries and
+        error handling work as for every other call.
+        """
+        return await self._request(method.upper(), path, params=params, json=json)
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+    ) -> Any:
+        authorization = await self._authorization()
+        response = await self._send(method, path, params=params, json=json, auth=authorization)
+        if response.status_code == 401 and self.auth.can_login:
+            authorization = await self._authorization(rejected=authorization)
+            response = await self._send(method, path, params=params, json=json, auth=authorization)
+        return decode_response(
+            response.status_code,
+            response.headers.get("content-type", ""),
+            response.content,
+            method=method,
+            path=path,
+        )
+
+    async def _authorization(self, rejected: str | None = None) -> str | None:
+        if self.auth.needs_login(rejected):
+            async with self._login_lock:
+                if self.auth.needs_login(rejected):
+                    await self._login()
+        return self.auth.authorization()
+
+    async def _login(self) -> None:
+        path = self.auth.login_path
+        if path is None:
+            return
+        wait = self.auth.suspended_for()
+        if wait:
+            raise LoginSuspendedError(
+                f"Not logging in for another {wait:.0f}s: the server rejected these "
+                "credentials and retrying could lock the account",
+                retry_after=wait,
+                path=path,
+            )
+        response = await self._send("POST", path, json=self.auth.login_body(), auth=None)
+        try:
+            body = decode_response(
+                response.status_code,
+                response.headers.get("content-type", ""),
+                response.content,
+                method="POST",
+                path=path,
+            )
+        except APIError as exc:
+            # Bad credentials come back as 400, not 401.
+            if exc.status_code in (400, 401, 403):
+                self.auth.suspend(self.login_cooldown)
+                raise AuthenticationError(
+                    f"BioTime rejected the login: {exc.detail or f'HTTP {exc.status_code}'}",
+                    status_code=exc.status_code,
+                    method="POST",
+                    path=path,
+                    detail=exc.detail,
+                    body=exc.body,
+                ) from None
+            raise
+        self.auth.accept_login(body)
+        logger.debug("logged in via %s", path)
+
+    async def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+        auth: str | None,
+    ) -> httpx.Response:
+        headers = {"Authorization": auth} if auth else None
+        attempt = 0
+        while True:
+            started = time.monotonic()
+            try:
+                response = await self._http.request(
+                    method, path, params=params, json=json, headers=headers
+                )
+            except httpx.TransportError as exc:
+                if method == "GET" and attempt < self.retries:
+                    attempt += 1
+                    logger.debug("%s %s failed (%s), retry %d", method, path, exc, attempt)
+                    await async_sleep(_backoff(attempt))
+                    continue
+                raise TransportError(f"{method} {path} failed: {exc!r}") from exc
+
+            elapsed = time.monotonic() - started
+            logger.debug("%s %s -> %d in %.2fs", method, path, response.status_code, elapsed)
+            if (
+                method == "GET"
+                and response.status_code in _RETRY_STATUSES
+                and attempt < self.retries
+            ):
+                attempt += 1
+                await async_sleep(_backoff(attempt))
+                continue
+            return response
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    async def __aenter__(self) -> AsyncBioTimeClient:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        await self.aclose()
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({str(self._http.base_url)!r}, auth={self.auth!r})"
+
+
+def _backoff(attempt: int) -> float:
+    """Exponential backoff with jitter: about 0.5 s, 1 s, 2 s, ..., capped at 10 s."""
+    return min(10.0, 0.5 * 2.0 ** (attempt - 1)) * (0.5 + random.random())  # noqa: S311

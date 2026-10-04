@@ -3,7 +3,7 @@
 from pybiotime.models._base import BioTimeModel
 from pybiotime.models.refs import AreaRef, DepartmentRef, PositionRef
 from pybiotime.models.terminal import Terminal
-from pybiotime.models.transaction import Transaction
+from pybiotime.models.transaction import Transaction, TransactionOrder
 
 __all__ = [
     "AreaRef",
@@ -12,4 +12,5 @@ __all__ = [
     "PositionRef",
     "Terminal",
     "Transaction",
+    "TransactionOrder",
 ]

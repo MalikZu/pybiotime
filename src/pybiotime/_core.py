@@ -9,9 +9,11 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
-from typing import Any
+from typing import Any, TypeVar
 from urllib.parse import parse_qsl, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from pydantic import BaseModel, ValidationError
 
 from pybiotime.errors import (
     APIError,
@@ -22,6 +24,7 @@ from pybiotime.errors import (
     NotFoundError,
     PaginationError,
     PermissionDeniedError,
+    ResponseShapeError,
     ServerError,
 )
 
@@ -279,3 +282,17 @@ def _identity(item: dict[str, Any]) -> Any:
 
 def _snippet(content: bytes) -> str:
     return content[:_SNIPPET_LENGTH].decode("utf-8", "replace").strip()
+
+
+M = TypeVar("M", bound=BaseModel)
+
+
+def build_model(model: type[M], data: Any, *, timezone: tzinfo | None, path: str) -> M:
+    """Validate one object from the server into `model`."""
+    try:
+        return model.model_validate(data, context={"timezone": timezone})
+    except ValidationError as exc:
+        raise ResponseShapeError(
+            f"{path}: unexpected {model.__name__} data: {exc.error_count()} problem(s), "
+            f"first: {exc.errors()[0]['loc']} {exc.errors()[0]['msg']}"
+        ) from exc
