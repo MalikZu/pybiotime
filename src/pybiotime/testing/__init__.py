@@ -28,7 +28,6 @@ import httpx
 __all__ = ["FakeBioTime", "RecordedRequest"]
 
 _FORMAT = "%Y-%m-%d %H:%M:%S"
-_HONOURED_ORDERS = {"punch_time", "-punch_time", "upload_time", "-upload_time"}
 _NOT_FOUND_PAGE = (
     b"<!DOCTYPE HTML>\n<html>\n<head><title>Page not found</title></head>\n"
     b"<body><h1>Page not found</h1></body>\n</html>\n"
@@ -56,6 +55,10 @@ class FakeBioTime:
     default_page_size: int = 10
     #: Lifetime of the JSON Web Tokens it issues.
     jwt_lifetime: float = 3600.0
+    #: Sort orders it honours for transactions; others are ignored, as on a real server.
+    honoured_orders: set[str] = field(
+        default_factory=lambda: {"punch_time", "-punch_time", "upload_time", "-upload_time"}
+    )
     terminals: list[dict[str, Any]] = field(default_factory=list)
     transactions: list[dict[str, Any]] = field(default_factory=list)
     requests: list[RecordedRequest] = field(default_factory=list)
@@ -221,7 +224,7 @@ class FakeBioTime:
 
         rows.sort(key=lambda r: r["id"])
         order = params.get("ordering")
-        if order in _HONOURED_ORDERS:
+        if order in self.honoured_orders:
             field_name = order.lstrip("-")
             # Ties fall back to id order, reversed for descending sorts, as the real server does.
             rows.sort(key=lambda r: (r[field_name], r["id"]), reverse=order.startswith("-"))
