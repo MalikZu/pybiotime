@@ -38,6 +38,8 @@ def employee_payload(fields: Mapping[str, Any] | None = None, **values: Any) -> 
             value = _day(value)
         elif name == "area":
             value = list(value)
+        elif name == "emp_code":
+            value = value.strip()
         elif name == "app_status":
             # BioTime takes 1 or 0 here, and rejects true and false.
             value = int(value)

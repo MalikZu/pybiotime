@@ -48,14 +48,15 @@ class AsyncCodedResource(Generic[M]):
         return await self._call("GET", f"{self.path}{object_id}/")
 
     async def get_by_code(self, code: str) -> M | None:
-        """Fetch the one with exactly this code, or ``None``."""
+        """Fetch the one with exactly this code, or ``None``. Spaces around it do not count."""
+        code = code.strip()
         async for item in self.list(code=code):
-            if getattr(item, self.code_field) == code:
+            if getattr(item, self.code_field).strip() == code:
                 return item
         return None
 
     async def create(self, code: str, name: str, *, parent_id: int | None = None) -> M:
-        body: dict[str, Any] = {self.code_field: code, self.name_field: name}
+        body: dict[str, Any] = {self.code_field: code.strip(), self.name_field: name}
         if parent_id is not None:
             body[self.parent_field] = parent_id
         return await self._write("POST", self.path, body, code=code)
@@ -69,6 +70,8 @@ class AsyncCodedResource(Generic[M]):
         parent_id: int | None = None,
     ) -> M:
         """Change the given fields; others stay as they are."""
+        if code is not None:
+            code = code.strip()
         changes = {
             key: value
             for key, value in (
@@ -94,7 +97,8 @@ class AsyncCodedResource(Generic[M]):
             return await self.create(code, name, parent_id=parent_id)
         parent = getattr(existing, self.parent_field)
         current_parent = parent.id if parent is not None else None
-        new_name = name if getattr(existing, self.name_field) != name else None
+        # Spaces around the name do not count: the server may have trimmed them.
+        new_name = name if getattr(existing, self.name_field).strip() != name.strip() else None
         new_parent = parent_id if parent_id is not None and parent_id != current_parent else None
         if new_name is None and new_parent is None:
             return existing
@@ -200,10 +204,12 @@ class AsyncEmployees:
     async def get_by_code(self, emp_code: str) -> Employee | None:
         """Fetch the employee with exactly this code, or ``None``.
 
-        Some servers match codes by prefix, so the result is checked here too.
+        Some servers match codes by prefix, so the result is checked here too. Spaces
+        around the code do not count.
         """
+        emp_code = emp_code.strip()
         async for employee in self.list(emp_code=emp_code):
-            if employee.emp_code == emp_code:
+            if employee.emp_code.strip() == emp_code:
                 return employee
         return None
 
