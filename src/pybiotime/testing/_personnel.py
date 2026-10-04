@@ -30,6 +30,9 @@ _CODED = {
     "positions": _Coded("position_code", "position_name", "parent_position", "position", True),
 }
 
+# Codes BioTime 9.5 ignores on update: they are not in its update schema.
+_FIXED_ON_UPDATE = {"departments": "dept_code", "employees": "emp_code"}
+
 # Employee fields that can be written but are never read back, as on BioTime 9.5.
 _WRITE_ONLY = ("self_password", "flow_role")
 
@@ -160,6 +163,8 @@ class PersonnelData:
     def _write(self, kind: str, row: dict[str, Any] | None, body: Any) -> httpx.Response:
         if not isinstance(body, dict):
             return httpx.Response(400, json={"non_field_errors": ["Invalid data."]})
+        if row is not None:
+            body = {k: v for k, v in body.items() if k != _FIXED_ON_UPDATE.get(kind)}
         merged = {**(row or {}), **body}
         errors = self._validate(kind, merged, row)
         if errors:

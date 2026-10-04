@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 from pybiotime._async.pagination import AsyncPager
 from pybiotime._core import build_model, merge_params, saved_object
-from pybiotime._personnel import employee_changes, employee_payload, resign_payload
+from pybiotime._personnel import (
+    code_kept_error,
+    employee_changes,
+    employee_payload,
+    resign_payload,
+)
 from pybiotime.errors import ResponseShapeError
 from pybiotime.models import Area, BioTimeModel, Department, Employee, Position, Resign
 
@@ -69,7 +74,11 @@ class AsyncCodedResource(Generic[M]):
         name: str | None = None,
         parent_id: int | None = None,
     ) -> M:
-        """Change the given fields; others stay as they are."""
+        """Change the given fields; others stay as they are.
+
+        Raises `APIError` if the server keeps the old code. BioTime 9.5 does not change
+        department codes.
+        """
         if code is not None:
             code = code.strip()
         changes = {
@@ -82,7 +91,11 @@ class AsyncCodedResource(Generic[M]):
             if value is not None
         }
         path = f"{self.path}{object_id}/"
-        return await self._write("PATCH", path, changes, object_id=object_id)
+        saved = await self._write("PATCH", path, changes, object_id=object_id)
+        kept: str = getattr(saved, self.code_field)
+        if code is not None and kept != code:
+            raise code_kept_error(path, self.code_field, kept)
+        return saved
 
     async def delete(self, object_id: int) -> None:
         await self._client._request("DELETE", f"{self.path}{object_id}/")
@@ -283,6 +296,9 @@ class AsyncEmployees:
 
         A ``None`` argument means "leave it". To clear a field, pass it in `fields`, for
         example ``fields={"position": None}``.
+
+        Raises `APIError` if the server keeps the old `emp_code`. BioTime 9.5 does not
+        change employee codes.
         """
         body = employee_payload(
             emp_code=emp_code,
@@ -304,7 +320,10 @@ class AsyncEmployees:
             fields=fields,
         )
         path = f"{self.path}{employee_id}/"
-        return await self._write("PATCH", path, body, employee_id=employee_id)
+        saved = await self._write("PATCH", path, body, employee_id=employee_id)
+        if "emp_code" in body and saved.emp_code != body["emp_code"]:
+            raise code_kept_error(path, "emp_code", saved.emp_code)
+        return saved
 
     async def delete(self, employee_id: int) -> None:
         """Delete an employee. To keep their history, resign them instead."""

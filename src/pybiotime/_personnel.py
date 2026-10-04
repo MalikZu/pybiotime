@@ -9,6 +9,7 @@ from typing import Any
 
 from pybiotime._core import DATETIME_FORMAT
 from pybiotime.compat import _FLAT_ATTENDANCE
+from pybiotime.errors import APIError
 from pybiotime.models import Employee
 
 # Keyword arguments whose API field has another name.
@@ -61,6 +62,15 @@ def employee_changes(existing: Employee, desired: Mapping[str, Any]) -> dict[str
         if current is not _UNKNOWN and not _same(current, value):
             changes[key] = value
     return changes
+
+
+def code_kept_error(path: str, field: str, kept: str) -> APIError:
+    """The error for an update whose new code the server ignored, as BioTime 9.5 does."""
+    message = (
+        f"PATCH {path}: the server kept {field} {kept!r}, so it does not change this code. "
+        "Any other changes were saved."
+    )
+    return APIError(message, status_code=200, method="PATCH", path=path, detail=message)
 
 
 def resign_payload(**values: Any) -> dict[str, Any]:

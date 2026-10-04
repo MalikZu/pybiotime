@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from pybiotime import (
+    APIError,
     AsyncBioTimeClient,
     BadRequestError,
     NotFoundError,
@@ -253,6 +254,20 @@ async def test_employee_and_resign_without_id_in_the_answer(fake: FakeBioTime) -
         )
     assert emp.id == fake.employees[0]["id"]
     assert resign.id == fake.resigns[0]["id"]
+
+
+@pytest.mark.anyio
+async def test_codes_the_server_does_not_change(fake: FakeBioTime) -> None:
+    async with client_for(fake) as client:
+        emp = await client.employees.create(
+            "1001", department_id=dept_id(fake, "OPS"), area_ids=[area_id(fake, "1")]
+        )
+        with pytest.raises(APIError, match="emp_code"):
+            await client.employees.update(emp.id, emp_code="E1001")
+        with pytest.raises(APIError, match="dept_code"):
+            await client.departments.update(dept_id(fake, "OPS"), code="OPS1")
+        area = await client.areas.update(area_id(fake, "1"), code="DXB")
+    assert area.area_code == "DXB"
 
 
 @pytest.mark.anyio

@@ -23,6 +23,8 @@ bt.departments.update(ops.id, name="Operations team")
   to the devices in that area.
 - **`upsert(code, name)`** creates the object if no object has that code. Otherwise it updates the name,
   and the parent if you pass `parent_id`. It sends a change only when something differs.
+- **Department codes do not change** on BioTime 9.5. Area and position codes do.
+  `update(id, code=...)` raises `APIError` when the server keeps the old code.
 - **Spaces around codes** are trimmed before a code is sent or looked up.
 
 ## Employees
@@ -47,6 +49,8 @@ emp = bt.employees.upsert(
   server has. Run it on every sync: when nothing changed, it sends nothing.
 - **Fields the server never sends back**, such as `self_password`, cannot be compared.
   `upsert` sets them when it creates the employee. Use `update` to change them later.
+- **`emp_code` does not change** on BioTime 9.5. `update(id, emp_code=...)` raises
+  `APIError` when the server keeps the old code.
 - **`update`** changes only the arguments you pass. To clear a field, pass it in `fields`,
   for example `fields={"position": None}`.
 - **Other fields**, including custom attributes, go in `fields` under their API name:
