@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from pybiotime import (
+    APIError,
     BadRequestError,
     BioTimeClient,
     NotFoundError,
@@ -241,6 +242,19 @@ def test_employee_and_resign_without_id_in_the_answer(fake: FakeBioTime) -> None
         )
     assert emp.id == fake.employees[0]["id"]
     assert resign.id == fake.resigns[0]["id"]
+
+
+def test_codes_the_server_does_not_change(fake: FakeBioTime) -> None:
+    with client_for(fake) as client:
+        emp = client.employees.create(
+            "1001", department_id=dept_id(fake, "OPS"), area_ids=[area_id(fake, "1")]
+        )
+        with pytest.raises(APIError, match="emp_code"):
+            client.employees.update(emp.id, emp_code="E1001")
+        with pytest.raises(APIError, match="dept_code"):
+            client.departments.update(dept_id(fake, "OPS"), code="OPS1")
+        area = client.areas.update(area_id(fake, "1"), code="DXB")
+    assert area.area_code == "DXB"
 
 
 def test_spaces_around_codes_do_not_count(fake: FakeBioTime) -> None:

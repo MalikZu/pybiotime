@@ -39,7 +39,8 @@ fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site], first_nam
 The fake checks what a real server checks: required fields, unique codes, and ids
 that must exist. Failures raise `BadRequestError` with `field_errors`, as on a real server.
 
-Like BioTime 9.5, it answers writes with related objects as bare ids, and never sends back
+Like BioTime 9.5, it keeps department and employee codes when an update tries to change
+them. It answers writes with related objects as bare ids, and never sends back
 `self_password` or `flow_role`.
 
 ## What it imitates
