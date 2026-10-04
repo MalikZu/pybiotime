@@ -206,3 +206,25 @@ class TestResigns:
             "disableatt": True,
             "reason": "",
         }
+
+
+@pytest.mark.parametrize("kind", ["departments", "areas", "positions"])
+def test_create_without_id_in_the_answer_is_read_back(fake: FakeBioTime, kind: str) -> None:
+    fake.creates_without_id = {kind}
+    with client_for(fake) as client:
+        created = getattr(client, kind).create("NEW", "New one")
+    stored = next(r for r in getattr(fake, kind) if r["id"] == created.id)
+    assert stored["id"] == created.id
+
+
+def test_employee_and_resign_without_id_in_the_answer(fake: FakeBioTime) -> None:
+    fake.creates_without_id = {"employees", "resigns"}
+    with client_for(fake) as client:
+        emp = client.employees.create(
+            "1001", department_id=dept_id(fake, "OPS"), area_ids=[area_id(fake, "1")]
+        )
+        resign = client.resigns.create(
+            emp.id, resign_date=date(2026, 10, 31), resign_type=ResignType.QUIT
+        )
+    assert emp.id == fake.employees[0]["id"]
+    assert resign.id == fake.resigns[0]["id"]

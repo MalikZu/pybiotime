@@ -57,6 +57,9 @@ class PersonnelData:
     positions: list[dict[str, Any]] = field(default_factory=list)
     employees: list[dict[str, Any]] = field(default_factory=list)
     resigns: list[dict[str, Any]] = field(default_factory=list)
+    #: Collections whose create answers echo the submitted fields without the new id.
+    #: BioTime 9.5 does this for positions.
+    creates_without_id: set[str] = field(default_factory=lambda: {"positions"})
 
     def _new_id(self) -> int:
         raise NotImplementedError
@@ -161,6 +164,8 @@ class PersonnelData:
         if row is None:
             row = {"id": self._new_id(), **body}
             getattr(self, kind).append(row)
+            if kind in self.creates_without_id:
+                return httpx.Response(201, json=body)
             status = 201
         else:
             row.update(body)
