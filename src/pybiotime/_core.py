@@ -9,6 +9,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
+from enum import Enum
 from typing import Any, TypeVar
 from urllib.parse import parse_qsl, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -224,6 +225,9 @@ def merge_params(*parts: Mapping[str, object | None]) -> Params:
 
 
 def _param_value(value: object) -> str:
+    # Send an enum's value: before Python 3.11, str(IntEnum member) is "Name.MEMBER".
+    if isinstance(value, Enum):
+        value = value.value
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
