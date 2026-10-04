@@ -207,6 +207,7 @@ class TestResigns:
 
             moved = client.resigns.update(resign.id, resign_date=date(2026, 11, 1))
             assert moved.resign_date == date(2026, 11, 1)
+            assert writes(fake, "PUT") == 1
 
             client.resigns.reinstate([resign.id])
             assert [r for r in client.resigns.list(employee_id=emp.id)] == []

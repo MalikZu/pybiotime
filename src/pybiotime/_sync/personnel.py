@@ -477,7 +477,9 @@ class Resigns:
             disable_attendance=disable_attendance,
             reason=reason,
         )
-        return self._write("PATCH", f"{self.path}{resign_id}/", body, resign_id=resign_id)
+        # BioTime 8.5 documents only PUT here. Every field is optional, so only what is
+        # sent changes.
+        return self._write("PUT", f"{self.path}{resign_id}/", body, resign_id=resign_id)
 
     def delete(self, resign_id: int) -> None:
         self._client._request("DELETE", f"{self.path}{resign_id}/")
