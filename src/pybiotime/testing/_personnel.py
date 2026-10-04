@@ -118,8 +118,8 @@ class PersonnelData:
         rows: list[dict[str, Any]] = getattr(self, kind)
         if not rest:
             if method == "GET":
-                rendered = [self._render(kind, r) for r in self._filter(kind, params)]
-                return self._list(path, params, rendered)
+                rendered = [self._render(kind, r) for r in rows]
+                return self._list(path, params, self._filter(kind, params, rendered))
             if method == "POST":
                 return self._write(kind, None, body)
             return _detail(405, f'Method "{method}" not allowed.')
@@ -141,21 +141,23 @@ class PersonnelData:
     ) -> httpx.Response:
         raise NotImplementedError
 
-    def _filter(self, kind: str, params: dict[str, str]) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = list(getattr(self, kind))
+    def _filter(
+        self, kind: str, params: dict[str, str], rows: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Filter rendered rows, so filters see the values a client sees."""
+        keys: tuple[str, ...]
         if kind in _CODED:
             spec = _CODED[kind]
-            keys = {spec.code: spec.code, spec.name: spec.name, spec.parent: spec.parent}
+            keys = (spec.code, spec.name, spec.parent)
         elif kind == "employees":
-            keys = {
-                k: k for k in ("emp_code", "first_name", "last_name", "department", "app_status")
-            }
-            rows.sort(key=lambda r: str(r["emp_code"]))
+            keys = ("emp_code", "first_name", "last_name", "department", "app_status")
+            rows = sorted(rows, key=lambda r: str(r["emp_code"]))
         else:
-            keys = {"employee": "employee", "resign_type": "resign_type"}
-        for param, key in keys.items():
-            if param in params:
-                rows = [r for r in rows if str(r.get(key)) == params[param]]
+            keys = ("employee", "resign_type")
+        for key in keys:
+            # An empty value does not filter, as with django-filter.
+            if params.get(key, "") != "":
+                rows = [r for r in rows if _shown(r.get(key)) == params[key]]
         return rows
 
     # --- writes -----------------------------------------------------------------------
@@ -325,3 +327,10 @@ class PersonnelData:
 
 def _detail(status: int, message: str) -> httpx.Response:
     return httpx.Response(status, json={"detail": message})
+
+
+def _shown(value: Any) -> str:
+    """A rendered value as a filter compares it: related objects by their id."""
+    if isinstance(value, dict):
+        value = value.get("id")
+    return str(value)
