@@ -13,7 +13,7 @@ from pydantic import model_validator
 
 from pybiotime.models._base import BioTimeModel
 
-__all__ = ["AreaRef", "DepartmentRef", "PositionRef"]
+__all__ = ["AreaRef", "DepartmentRef", "EmployeeRef", "PositionRef"]
 
 
 class _Ref(BioTimeModel):
@@ -40,3 +40,9 @@ class DepartmentRef(_Ref):
 class PositionRef(_Ref):
     position_code: str | None = None
     position_name: str | None = None
+
+
+class EmployeeRef(_Ref):
+    emp_code: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None

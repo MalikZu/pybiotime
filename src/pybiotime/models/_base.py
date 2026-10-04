@@ -7,7 +7,7 @@ of that and give one clean Python type.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, ValidationInfo
@@ -78,3 +78,6 @@ BioTimeDateTime = Annotated[datetime, AfterValidator(_attach_timezone)]
 OptionalDateTime = Annotated[
     datetime | None, BeforeValidator(_blank_to_none), AfterValidator(_attach_timezone)
 ]
+
+#: A date; "" counts as none.
+OptionalDate = Annotated[date | None, BeforeValidator(_blank_to_none)]

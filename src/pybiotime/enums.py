@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from enum import Enum, IntEnum
 
-__all__ = ["PunchState", "VerifyType"]
+__all__ = ["DevicePrivilege", "EmploymentType", "PunchState", "ResignType", "VerifyType"]
 
 
 class PunchState(str, Enum):
@@ -33,3 +33,31 @@ class VerifyType(IntEnum):
     CARD = 4
     FACE = 15
     PALM = 25
+
+
+class EmploymentType(IntEnum):
+    """An employee's `emp_type`."""
+
+    OFFICIAL = 1
+    TEMPORARY = 2
+    PROBATION = 3
+
+
+class DevicePrivilege(IntEnum):
+    """What an employee may do on the devices: `dev_privilege`."""
+
+    EMPLOYEE = 0
+    REGISTER = 2
+    SYSTEM_ADMINISTRATOR = 6
+    USER_DEFINED = 10
+    SUPER_ADMINISTRATOR = 14
+
+
+class ResignType(IntEnum):
+    """Why an employee left: a resignation's `resign_type`."""
+
+    QUIT = 1
+    DISMISSED = 2
+    RESIGN = 3
+    TRANSFER = 4
+    RETAIN_JOB_WITHOUT_SALARY = 5
