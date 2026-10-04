@@ -56,14 +56,10 @@ def test_resigns_read(client: BioTimeClient) -> None:
 )
 def test_round_trip(client: BioTimeClient) -> None:
     tag = "PYBT" + secrets.token_hex(3).upper()
-    created: list[tuple[str, int]] = []
     try:
         dept = client.departments.create(tag, f"{tag} department")
-        created.append(("departments", dept.id))
         area = client.areas.create(tag, f"{tag} area")
-        created.append(("areas", area.id))
         position = client.positions.create(tag, f"{tag} position")
-        created.append(("positions", position.id))
 
         assert client.departments.upsert(tag, f"{tag} department").id == dept.id
         renamed = client.departments.upsert(tag, f"{tag} renamed")
@@ -72,7 +68,6 @@ def test_round_trip(client: BioTimeClient) -> None:
         emp = client.employees.create(
             tag, department_id=dept.id, area_ids=[area.id], first_name="Test", last_name=tag
         )
-        created.insert(0, ("employees", emp.id))
         assert emp.department_id == dept.id
         assert emp.area_ids == [area.id]
 
@@ -92,9 +87,17 @@ def test_round_trip(client: BioTimeClient) -> None:
         client.resigns.reinstate([resign.id])
         assert all(r.id != resign.id for r in client.resigns.list(employee_id=emp.id))
     finally:
-        for kind, object_id in created:
-            with contextlib.suppress(NotFoundError):
-                getattr(client, kind).delete(object_id)
-    for kind, object_id in created:
-        with pytest.raises(NotFoundError):
-            getattr(client, kind).get(object_id)
+        # Clean up by code, so records are removed even when a step failed before
+        # its id was known. Employees go first: they refer to the others.
+        employee = client.employees.get_by_code(tag)
+        if employee is not None:
+            client.employees.delete(employee.id)
+        for kind in ("departments", "areas", "positions"):
+            manager = getattr(client, kind)
+            leftover = manager.get_by_code(tag)
+            if leftover is not None:
+                with contextlib.suppress(NotFoundError):
+                    manager.delete(leftover.id)
+    assert client.employees.get_by_code(tag) is None
+    for kind in ("departments", "areas", "positions"):
+        assert getattr(client, kind).get_by_code(tag) is None
