@@ -68,6 +68,10 @@ How it works: it reads the newest arrivals first, back to just before the previo
 newest arrival. It also re-reads punch times from the last day (`lookback=`) as a safety
 net. It remembers the highest id and the recently seen ids, so each punch comes back once.
 
+Each run checks that the server really sorts by arrival time. On a server that does not,
+`read_new` relies on the punch-time window for that run, and `result.state["upload_order"]`
+says `"unsupported"`.
+
 A punch can still come back twice in rare cases. Store punches keyed on the server and
 the `id`, and skip ones you already have.
 

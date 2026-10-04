@@ -9,9 +9,10 @@ was seen to tell new from old across runs, and stays small enough to store anywh
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from itertools import pairwise
 from typing import Any, Literal
 
 from pybiotime._core import DATETIME_FORMAT
@@ -42,7 +43,8 @@ class ReadState:
     recent_ids: set[int] = field(default_factory=set)
     #: Newest upload time seen, in server time, as BioTime formats it.
     max_upload_time: str | None = None
-    #: Whether the server honours sorting by upload time.
+    #: Whether the server honoured the upload-time sort the last time a page could tell.
+    #: For information only: every run checks again, so one wrong reading never sticks.
     upload_order: UploadOrder = "unknown"
 
     @classmethod
@@ -111,3 +113,27 @@ class ReadResult:
 def naive(value: datetime) -> datetime:
     """Drop the timezone the client may have attached. Server times are compared as sent."""
     return value.replace(tzinfo=None)
+
+
+def latest(*values: datetime | None) -> datetime | None:
+    """The latest of the given times, ignoring ``None``."""
+    present = [value for value in values if value is not None]
+    return max(present) if present else None
+
+
+def page_order(uploads: Sequence[datetime]) -> UploadOrder:
+    """How one page of a newest-arrival-first listing is really ordered.
+
+    One page is one database query, so an upload time that rises inside it proves the
+    server ignored the sort: ``"unsupported"``. Only falls means ``"ok"``. A page whose
+    rows all share one upload time cannot tell: ``"unknown"``.
+
+    Never compare across pages. Punches that arrive while a client pages push rows onto
+    later pages, so the next page can start newer than the previous one ended.
+    """
+    pairs = list(pairwise(uploads))
+    if any(later > earlier for earlier, later in pairs):
+        return "unsupported"
+    if any(later < earlier for earlier, later in pairs):
+        return "ok"
+    return "unknown"

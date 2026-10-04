@@ -127,6 +127,9 @@ class Transactions:
         2. Punch times from `lookback` before the newest arrival. This is a safety net
            for servers that do not sort by arrival time.
 
+        Each run checks again whether the server sorts by arrival time. When a run finds
+        that it does not, only the second scan counts for that run.
+
         A punch can still be returned twice in rare cases, so key your storage on
         the server and the transaction `id`.
         """

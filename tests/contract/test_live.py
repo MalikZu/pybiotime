@@ -61,14 +61,18 @@ def test_detail_matches_list(client: BioTimeClient) -> None:
 
 
 def test_read_new_twice(client: BioTimeClient) -> None:
-    newest = client.transactions.list(order_by="-upload_time").first()
-    if newest is None or newest.upload_time is None:
+    page = client.transactions.list(order_by="-upload_time", page_size=50).first_page()
+    uploads = [p.upload_time for p in page.items if p.upload_time is not None]
+    if not uploads:
         pytest.skip("no transactions on this server")
-    first = client.transactions.read_new(start=newest.punch_time - timedelta(days=2))
+    first = client.transactions.read_new(start=page.items[0].punch_time - timedelta(days=2))
     second = client.transactions.read_new(first.state)
     seen = {t.id for t in first.transactions}
     assert not seen & {t.id for t in second.transactions}
-    assert first.state["upload_order"] in ("ok", "unsupported")
+    if len(set(uploads)) > 1 and uploads == sorted(uploads, reverse=True):
+        # This server visibly sorts by arrival, so read_new must use that.
+        assert first.state["upload_order"] == "ok"
+        assert second.state["upload_order"] == "ok"
 
 
 def test_unknown_path_is_a_fault_page(client: BioTimeClient) -> None:
