@@ -27,6 +27,8 @@ from urllib.parse import urlencode
 
 import httpx
 
+from pybiotime.testing._personnel import PersonnelData
+
 __all__ = ["FakeBioTime", "RecordedRequest"]
 
 _FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -47,7 +49,7 @@ class RecordedRequest:
 
 
 @dataclass
-class FakeBioTime:
+class FakeBioTime(PersonnelData):
     """In-memory BioTime server. All state is public so tests can inspect and change it."""
 
     username: str = "api"
@@ -186,6 +188,10 @@ class FakeBioTime:
         if scheme not in ("Token", "JWT") or token not in self.tokens or _expired(token):
             return _detail(401, "Invalid token.")
 
+        if path.startswith("/personnel/api/"):
+            answer = self._personnel(request.method, path, params, request.json)
+            if answer is not None:
+                return answer
         if path == "/iclock/api/terminals/":
             return self._list(path, params, self._filter_terminals(params))
         if path == "/iclock/api/transactions/":
