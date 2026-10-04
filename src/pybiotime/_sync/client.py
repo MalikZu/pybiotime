@@ -14,6 +14,13 @@ import httpx
 
 from pybiotime._concurrency import Lock, sleep
 from pybiotime._core import decode_response, resolve_timezone
+from pybiotime._sync.personnel import (
+    Areas,
+    Departments,
+    Employees,
+    Positions,
+    Resigns,
+)
 from pybiotime._sync.resources import Terminals, Transactions
 from pybiotime._version import __version__
 from pybiotime.auth import Auth
@@ -93,6 +100,11 @@ class BioTimeClient:
         )
         self.terminals = Terminals(self)
         self.transactions = Transactions(self)
+        self.departments = Departments(self)
+        self.areas = Areas(self)
+        self.positions = Positions(self)
+        self.employees = Employees(self)
+        self.resigns = Resigns(self)
 
     def request(
         self,

@@ -4,7 +4,13 @@ from pybiotime._async import AsyncBioTimeClient, AsyncPager
 from pybiotime._sync import BioTimeClient, Pager
 from pybiotime._version import __version__
 from pybiotime.auth import BasicAuth, JWTAuth, StaffJWTAuth, StaffTokenAuth, TokenAuth
-from pybiotime.enums import PunchState, VerifyType
+from pybiotime.enums import (
+    DevicePrivilege,
+    EmploymentType,
+    PunchState,
+    ResignType,
+    VerifyType,
+)
 from pybiotime.errors import (
     APIError,
     AuthenticationError,
@@ -21,11 +27,20 @@ from pybiotime.errors import (
     TransportError,
 )
 from pybiotime.incremental import ReadResult, ReadStateError
-from pybiotime.models import Terminal, Transaction
+from pybiotime.models import (
+    Area,
+    Department,
+    Employee,
+    Position,
+    Resign,
+    Terminal,
+    Transaction,
+)
 from pybiotime.pagination import Page
 
 __all__ = [
     "APIError",
+    "Area",
     "AsyncBioTimeClient",
     "AsyncPager",
     "AuthenticationError",
@@ -33,6 +48,10 @@ __all__ = [
     "BasicAuth",
     "BioTimeClient",
     "BioTimeError",
+    "Department",
+    "DevicePrivilege",
+    "Employee",
+    "EmploymentType",
     "FaultPageError",
     "JWTAuth",
     "LicenseError",
@@ -42,9 +61,12 @@ __all__ = [
     "Pager",
     "PaginationError",
     "PermissionDeniedError",
+    "Position",
     "PunchState",
     "ReadResult",
     "ReadStateError",
+    "Resign",
+    "ResignType",
     "ResponseShapeError",
     "ServerError",
     "StaffJWTAuth",

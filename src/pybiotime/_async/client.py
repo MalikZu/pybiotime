@@ -10,6 +10,13 @@ from typing import Any
 
 import httpx
 
+from pybiotime._async.personnel import (
+    AsyncAreas,
+    AsyncDepartments,
+    AsyncEmployees,
+    AsyncPositions,
+    AsyncResigns,
+)
 from pybiotime._async.resources import AsyncTerminals, AsyncTransactions
 from pybiotime._concurrency import AsyncLock, async_sleep
 from pybiotime._core import decode_response, resolve_timezone
@@ -91,6 +98,11 @@ class AsyncBioTimeClient:
         )
         self.terminals = AsyncTerminals(self)
         self.transactions = AsyncTransactions(self)
+        self.departments = AsyncDepartments(self)
+        self.areas = AsyncAreas(self)
+        self.positions = AsyncPositions(self)
+        self.employees = AsyncEmployees(self)
+        self.resigns = AsyncResigns(self)
 
     async def request(
         self,
