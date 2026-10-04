@@ -23,7 +23,8 @@ It holds the current status, decisions and next step. `internal/` is not in git.
 - **Never log secrets.** Redact the `Authorization` header, passwords, and the
   hashes the API returns (`self_password`, `device_password`, `card_no`).
 - **No network in unit tests.** Use fixtures or `pybiotime.testing`. Live-server
-  tests are opt-in through `BIOTIME_URL`, `BIOTIME_USERNAME`, `BIOTIME_PASSWORD`.
+  tests are opt-in through `BIOTIME_URL` plus `BIOTIME_TOKEN` or
+  `BIOTIME_USERNAME`/`BIOTIME_PASSWORD`, and never write.
 - **Never commit vendor manuals or copy their prose.** ZKTeco PDFs stay in
   `internal/vendor/`. Docs restate facts in our own words.
 
