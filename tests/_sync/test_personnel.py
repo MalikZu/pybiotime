@@ -154,6 +154,18 @@ class TestEmployees:
         patch = next(r.json for r in fake.requests if r.method == "PATCH")
         assert set(patch) == {"area", "first_name"}
 
+    def test_upsert_sets_write_only_fields_once(self, fake: FakeBioTime) -> None:
+        kwargs = {"department_id": dept_id(fake, "OPS"), "area_ids": [area_id(fake, "1")]}
+        with client_for(fake) as client:
+            for _ in range(3):
+                client.employees.upsert(
+                    "1001",
+                    fields={"self_password": "default-123"},
+                    **kwargs,  # type: ignore[arg-type]
+                )
+        assert fake.employees[0]["self_password"] == "default-123"
+        assert writes(fake, "PATCH") == 0
+
     def test_update_and_delete(self, fake: FakeBioTime) -> None:
         with client_for(fake) as client:
             created = client.employees.create(

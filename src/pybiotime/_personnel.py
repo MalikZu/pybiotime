@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import date, datetime
+from enum import Enum
 from typing import Any
 
 from pybiotime._core import DATETIME_FORMAT
+from pybiotime.compat import _FLAT_ATTENDANCE
 from pybiotime.models import Employee
 
 # Keyword arguments whose API field has another name.
 _RENAMED = {"department_id": "department", "area_ids": "area", "position_id": "position"}
+
+# Read as a hash (8.x) or not at all (9.5), so it can never be compared.
+_WRITE_ONLY = {"self_password"}
+
+# Employee properties that give the ids behind a relation.
+_IDS = {"department": "department_id", "position": "position_id", "area": "area_ids"}
+
+_UNKNOWN = object()
 
 
 def employee_payload(fields: Mapping[str, Any] | None = None, **values: Any) -> dict[str, Any]:
@@ -38,10 +48,17 @@ def employee_payload(fields: Mapping[str, Any] | None = None, **values: Any) -> 
 
 
 def employee_changes(existing: Employee, desired: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the part of `desired` that differs from `existing`."""
-    return {
-        key: value for key, value in desired.items() if not _same(_current(existing, key), value)
-    }
+    """Return the part of `desired` that differs from `existing`.
+
+    Fields the server does not send back, such as passwords, cannot be compared, so
+    they are left out.
+    """
+    changes: dict[str, Any] = {}
+    for key, value in desired.items():
+        current = _current(existing, key)
+        if current is not _UNKNOWN and not _same(current, value):
+            changes[key] = value
+    return changes
 
 
 def resign_payload(**values: Any) -> dict[str, Any]:
@@ -69,23 +86,51 @@ def _wire(value: Any) -> Any:
 
 
 def _current(employee: Employee, key: str) -> Any:
-    if key == "department":
-        return employee.department_id
-    if key == "position":
-        return employee.position_id
-    if key == "area":
-        return employee.area_ids
+    """The server's value for `key`, or `_UNKNOWN` when it did not send one."""
+    if key in _WRITE_ONLY:
+        return _UNKNOWN
+    if key == "attemployee" or key in _FLAT_ATTENDANCE:
+        # Both shapes of the attendance flags are read into `attendance`.
+        if employee.attendance is None:
+            return _UNKNOWN
+        flags = employee.attendance.model_dump()
+        return flags if key == "attemployee" else flags[_FLAT_ATTENDANCE[key]]
     if key in Employee.model_fields:
-        return getattr(employee, key)
-    return employee.extra.get(key)
+        if key not in employee.model_fields_set:
+            return _UNKNOWN
+        return getattr(employee, _IDS.get(key, key))
+    return employee.extra.get(key, _UNKNOWN)
 
 
 def _same(current: Any, wanted: Any) -> bool:
-    if isinstance(current, date):
-        current = current.isoformat()
-    if isinstance(wanted, Sequence) and not isinstance(wanted, str):
-        return isinstance(current, list) and sorted(current) == sorted(wanted)
+    current, wanted = _plain(current), _plain(wanted)
+    if isinstance(wanted, Mapping):
+        return isinstance(current, Mapping) and all(
+            _same(current.get(key), value) for key, value in wanted.items()
+        )
+    if isinstance(wanted, (list, tuple, set, frozenset)):
+        # Order and repeats do not matter: [1, 1] stores the same areas as [1].
+        return isinstance(current, (list, tuple)) and _bag(current) == _bag(wanted)
     # BioTime sends "" and null interchangeably for empty text.
-    if current in (None, "") and wanted in (None, ""):
+    if _blank(current) and _blank(wanted):
         return True
-    return bool(current == wanted)
+    if current is None or wanted is None:
+        return False
+    # Compare as stored: BioTime keeps 17 as "17", reads "-1" as -1 and trims text.
+    return str(current).strip() == str(wanted).strip()
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Enum):
+        value = value.value
+    if isinstance(value, bool):
+        return int(value)
+    return _wire(value)
+
+
+def _bag(values: Any) -> set[str]:
+    return {str(_plain(value)).strip() for value in values}
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())

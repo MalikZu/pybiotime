@@ -30,6 +30,9 @@ _CODED = {
     "positions": _Coded("position_code", "position_name", "parent_position", "position", True),
 }
 
+# Employee fields that can be written but are never read back, as on BioTime 9.5.
+_WRITE_ONLY = ("self_password", "flow_role")
+
 _EMPLOYEE_TEXT = (
     "first_name",
     "last_name",
@@ -287,7 +290,9 @@ class PersonnelData:
                 "update_time": row.get("update_time"),
             }
         )
-        rendered.update({k: v for k, v in row.items() if k not in rendered})
+        rendered.update(
+            {k: v for k, v in row.items() if k not in rendered and k not in _WRITE_ONLY}
+        )
         return rendered
 
     def _render_resign(self, row: dict[str, Any]) -> dict[str, Any]:

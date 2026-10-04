@@ -161,6 +161,19 @@ class TestEmployees:
         assert set(patch) == {"area", "first_name"}
 
     @pytest.mark.anyio
+    async def test_upsert_sets_write_only_fields_once(self, fake: FakeBioTime) -> None:
+        kwargs = {"department_id": dept_id(fake, "OPS"), "area_ids": [area_id(fake, "1")]}
+        async with client_for(fake) as client:
+            for _ in range(3):
+                await client.employees.upsert(
+                    "1001",
+                    fields={"self_password": "default-123"},
+                    **kwargs,  # type: ignore[arg-type]
+                )
+        assert fake.employees[0]["self_password"] == "default-123"
+        assert writes(fake, "PATCH") == 0
+
+    @pytest.mark.anyio
     async def test_update_and_delete(self, fake: FakeBioTime) -> None:
         async with client_for(fake) as client:
             created = await client.employees.create(
