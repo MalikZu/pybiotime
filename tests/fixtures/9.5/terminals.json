@@ -1,0 +1,32 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "msg": "",
+  "code": 0,
+  "data": [
+    {
+      "id": 7,
+      "sn": "TEST0000001",
+      "ip_address": "192.0.2.10",
+      "alias": "Main gate",
+      "terminal_name": null,
+      "fw_ver": null,
+      "push_ver": null,
+      "state": "1",
+      "terminal_tz": 240,
+      "area": {"id": 1, "area_code": "1", "area_name": "Head office"},
+      "last_activity": "2026-10-03 23:23:15",
+      "user_count": null,
+      "fp_count": null,
+      "face_count": null,
+      "palm_count": null,
+      "transaction_count": null,
+      "push_time": null,
+      "transfer_time": "00:00;14:05",
+      "transfer_interval": 1,
+      "is_attendance": 1,
+      "area_name": "Head office"
+    }
+  ]
+}
