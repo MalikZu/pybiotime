@@ -510,6 +510,9 @@ class Resigns:
         newest: Resign | None = None
         if employee_id is not None:
             for resign in self.list(employee_id=employee_id):
+                # Servers ignore filters they do not know, so check the employee here too.
+                if resign.employee.id != employee_id:
+                    continue
                 if newest is None or resign.id > newest.id:
                     newest = resign
         if newest is None:

@@ -281,6 +281,24 @@ async def test_spaces_around_codes_do_not_count(fake: FakeBioTime) -> None:
 
 
 @pytest.mark.anyio
+async def test_resign_read_back_checks_the_employee(
+    fake: FakeBioTime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake.creates_without_id = {"resigns"}
+    ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
+    alice = fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site])
+    bob = fake.add_employee(emp_code="1002", department_id=ops, area_ids=[site])
+    fake.resigns.append({"id": 999, "employee": bob, "resign_type": 1})
+    # A server that ignores the employee filter.
+    monkeypatch.setattr(fake, "_filter", lambda kind, params, rows: rows)
+    async with client_for(fake) as client:
+        resign = await client.resigns.create(
+            alice, resign_date=date(2026, 10, 31), resign_type=ResignType.QUIT
+        )
+    assert resign.employee.id == alice
+
+
+@pytest.mark.anyio
 async def test_list_filters_on_the_values_shown(fake: FakeBioTime) -> None:
     ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
     fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site])
