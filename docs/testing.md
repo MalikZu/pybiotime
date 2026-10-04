@@ -40,3 +40,15 @@ The same `transport()` works with `AsyncBioTimeClient`.
 - `fake.fail_next(503, path="/iclock/")` answers the next matching request with an error.
 - `fake.tokens.clear()` makes the server reject the current token.
 - `upload_time=` on `add_transaction` imitates a device that uploads late.
+- `fake.after_request` is called with each request after it is answered. Use it to add
+  punches while your code is paging, as devices do on a live server:
+
+```python
+def add_punch_once(request):
+    if request.path == "/iclock/api/transactions/" and "page" not in request.params:
+        fake.after_request = None
+        fake.add_transaction(emp_code="1002", punch_time=datetime(2026, 10, 1, 8, 5))
+
+
+fake.after_request = add_punch_once
+```

@@ -2,7 +2,8 @@
 
 `FakeBioTime` answers like a BioTime 9.5 server, including its quirks: next links that
 point at an internal host, sort orders it ignores, HTML pages for unknown paths and
-400 for rejected logins. Plug it into either client:
+400 for rejected logins. `after_request` lets a test change the data between requests,
+as new punches do on a live server. Plug it into either client:
 
     fake = FakeBioTime(username="api", password="secret")
     fake.add_terminal(sn="TEST0000001", alias="Main gate")
@@ -18,6 +19,7 @@ import base64
 import json
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -66,6 +68,9 @@ class FakeBioTime:
     #: Statuses to answer the next matching requests with, before any real handling.
     #: Each entry is ``(method, path_prefix, status)``; it is removed once used.
     failures: list[tuple[str, str, int]] = field(default_factory=list)
+    #: Called with each request after it is answered. Use it to change the data between
+    #: requests, for example to add punches while a client is paging.
+    after_request: Callable[[RecordedRequest], None] | None = None
     _next_id: int = 1
 
     def transport(self) -> httpx.MockTransport:
@@ -147,21 +152,30 @@ class FakeBioTime:
     # --- HTTP -------------------------------------------------------------------------
 
     def handle(self, request: httpx.Request) -> httpx.Response:
-        path = request.url.path
-        params = dict(request.url.params)
         body = json.loads(request.content) if request.content else None
-        authorization = request.headers.get("Authorization")
-        self.requests.append(
-            RecordedRequest(request.method, request.url.host, path, params, authorization, body)
+        recorded = RecordedRequest(
+            request.method,
+            request.url.host,
+            request.url.path,
+            dict(request.url.params),
+            request.headers.get("Authorization"),
+            body,
         )
+        self.requests.append(recorded)
+        response = self._respond(recorded)
+        if self.after_request is not None:
+            self.after_request(recorded)
+        return response
 
+    def _respond(self, request: RecordedRequest) -> httpx.Response:
+        path, params, authorization = request.path, request.params, request.authorization
         for index, (method, prefix, status) in enumerate(self.failures):
             if request.method == method and path.startswith(prefix):
                 del self.failures[index]
                 return httpx.Response(status, json={"detail": f"Injected HTTP {status}."})
 
         if path in ("/api-token-auth/", "/jwt-api-token-auth/"):
-            return self._login(request.method, path, body)
+            return self._login(request.method, path, request.json)
         if not path.startswith(("/iclock/api/", "/personnel/api/")):
             html = {"Content-Type": "text/html"}
             return httpx.Response(200, content=_NOT_FOUND_PAGE, headers=html)
