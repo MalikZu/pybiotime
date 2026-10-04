@@ -68,8 +68,8 @@ class Employee(BioTimeModel):
     format_name: str | None = None
     department: DepartmentRef | None = None
     position: PositionRef | None = None
-    #: An employee can belong to several areas.
-    area: list[AreaRef] = Field(default_factory=list)
+    #: An employee can belong to several areas. A tuple, so the frozen model can be hashed.
+    area: tuple[AreaRef, ...] = ()
     attendance: EmployeeAttendance | None = None
     hire_date: OptionalDate = None
     birthday: OptionalDate = None
@@ -112,9 +112,9 @@ class Employee(BioTimeModel):
     @classmethod
     def _area_list(cls, value: Any) -> Any:
         if value is None or value == "":
-            return []
-        if not isinstance(value, list):
-            return [value]
+            return ()
+        if not isinstance(value, (list, tuple)):
+            return (value,)
         return value
 
     @property
