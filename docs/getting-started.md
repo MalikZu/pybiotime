@@ -8,7 +8,8 @@ pybiotime is not on PyPI yet. Once it is:
 pip install pybiotime
 ```
 
-It needs Python 3.10 or newer, and installs `httpx` and `pydantic`.
+It needs Python 3.10 or newer, and installs `httpx` and `pydantic`. On Windows it also
+installs `tzdata`, because Windows has no timezone database of its own.
 
 ## Connect
 

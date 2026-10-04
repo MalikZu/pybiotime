@@ -19,7 +19,7 @@ A typed Python client for the ZKTeco BioTime REST API.
   including late uploads from offline devices.
 - Ships an [in-memory fake server](testing.md), so you can test your code without a BioTime server.
 
-It runs on Python 3.10 to 3.14 and depends only on `httpx` and `pydantic`.
+It runs on Python 3.10 to 3.14 and depends only on `httpx` and `pydantic`, plus `tzdata` on Windows.
 It does not depend on any web framework.
 
 ```python
