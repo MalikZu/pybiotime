@@ -24,6 +24,8 @@ classifiers = [
 dependencies = [
     "httpx>=0.27,<1",
     "pydantic>=2.6,<3",
+    # Windows has no timezone database, so zoneinfo needs this package there.
+    "tzdata>=2023.3; sys_platform == 'win32'",
 ]
 
 [project.urls]
