@@ -20,7 +20,7 @@ uv run pre-commit run --all-files
 
 Unit tests never touch the network. They use recorded responses and the fake server.
 
-Tests against a real BioTime server are opt-in and read-only. Set these variables to run them:
+Tests against a real BioTime server are opt-in. Set these variables to run them:
 
 - `BIOTIME_URL`, for example `http://10.0.0.5:8090`
 - `BIOTIME_TOKEN`, or `BIOTIME_USERNAME` and `BIOTIME_PASSWORD`
@@ -29,6 +29,10 @@ Tests against a real BioTime server are opt-in and read-only. Set these variable
 ```bash
 uv run pytest tests/contract
 ```
+
+One test writes: it creates a department, area, position and employee with codes that
+start with `PYBT`, changes them, then deletes them. It runs only with
+`BIOTIME_WRITE_TESTS=1`. Never point it at a production server.
 
 ## Sync and async code
 
