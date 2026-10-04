@@ -168,7 +168,7 @@ class PersonnelData:
         if row is not None:
             body = {k: v for k, v in body.items() if k != _FIXED_ON_UPDATE.get(kind)}
         merged = {**(row or {}), **body}
-        errors = self._validate(kind, merged, row)
+        errors = self._validate(kind, merged, row, set(body))
         if errors:
             return httpx.Response(400, json=errors)
         if row is None:
@@ -188,7 +188,7 @@ class PersonnelData:
         return httpx.Response(status, json={k: v for k, v in row.items() if k not in _WRITE_ONLY})
 
     def _validate(
-        self, kind: str, data: dict[str, Any], current: dict[str, Any] | None
+        self, kind: str, data: dict[str, Any], current: dict[str, Any] | None, sent: set[str]
     ) -> dict[str, list[str]]:
         errors: dict[str, list[str]] = {}
         required: tuple[str, ...]
@@ -202,7 +202,7 @@ class PersonnelData:
             unique = "emp_code"
             references = {"department": "departments", "position": "positions"}
             areas = data.get("area")
-            if isinstance(areas, list):
+            if "area" in sent and isinstance(areas, list):
                 known = {a["id"] for a in self.areas}
                 missing = [a for a in areas if a not in known]
                 if missing:
@@ -223,9 +223,12 @@ class PersonnelData:
         if clash and unique not in errors:
             label = _CODED[kind].label if kind in _CODED else kind.rstrip("s")
             errors[unique] = [f"{label} with this {unique} already exists."]
+        # Like a real server, check only the references that were sent.
         for key, target in references.items():
             value = data.get(key)
-            if value is not None and not any(r["id"] == value for r in getattr(self, target)):
+            if key not in sent or value is None:
+                continue
+            if not any(r["id"] == value for r in getattr(self, target)):
                 errors[key] = [f'Invalid pk "{value}" - object does not exist.']
         return errors
 
@@ -294,7 +297,8 @@ class PersonnelData:
                     "enable_schedule": True,
                 },
                 "dev_privilege": row.get("dev_privilege", 0),
-                "area": [ref("areas", a) for a in row.get("area", [])],
+                # Areas deleted since are left out: a real server drops those links.
+                "area": [r for r in (ref("areas", a) for a in row.get("area", [])) if r],
                 "app_status": row.get("app_status", 0),
                 "app_role": row.get("app_role", 1),
                 "update_time": row.get("update_time"),
