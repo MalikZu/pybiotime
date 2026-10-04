@@ -264,3 +264,14 @@ def test_spaces_around_codes_do_not_count(fake: FakeBioTime) -> None:
     assert position.position_code == "NEW"
     assert ops.id == dept_id(fake, "OPS")
     assert writes(fake, "PATCH") == 0
+
+
+def test_list_filters_on_the_values_shown(fake: FakeBioTime) -> None:
+    ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
+    fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site])
+    with client_for(fake) as client:
+        without_app = [e for e in client.employees.list(app_status=0)]
+        as_bool = [e for e in client.employees.list(app_status=False)]
+    assert [e.emp_code for e in without_app] == ["1001"]
+    assert as_bool == without_app
+    assert fake.requests[-1].params["app_status"] == "0"
