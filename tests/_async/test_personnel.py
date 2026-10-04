@@ -300,6 +300,23 @@ async def test_resign_read_back_checks_the_employee(
 
 
 @pytest.mark.anyio
+async def test_deleted_references_leave_employees_readable(fake: FakeBioTime) -> None:
+    site, warehouse, tech = area_id(fake, "1"), area_id(fake, "10"), fake.positions[0]["id"]
+    emp_id = fake.add_employee(
+        emp_code="1001",
+        department_id=dept_id(fake, "OPS"),
+        area_ids=[site, warehouse],
+        position=tech,
+    )
+    async with client_for(fake) as client:
+        await client.areas.delete(warehouse)
+        await client.positions.delete(tech)
+        emp = await client.employees.update(emp_id, first_name="Sara")
+    assert emp.area_ids == [site]
+    assert emp.position is None
+
+
+@pytest.mark.anyio
 async def test_list_filters_on_the_values_shown(fake: FakeBioTime) -> None:
     ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
     fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site])
