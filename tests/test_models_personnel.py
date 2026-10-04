@@ -54,6 +54,13 @@ class TestEmployee:
         )
         assert "enable_att" not in emp.extra
 
+    def test_8_0_names_move_into_the_references(self) -> None:
+        emp = Employee.model_validate(employee("8.0"))
+        assert emp.department is not None
+        assert emp.department.dept_name == "Operations"
+        assert [area.area_name for area in emp.area] == ["Head office", "Warehouse"]
+        assert not {"dept_name", "position_name", "area_name"} & set(emp.extra)
+
     def test_can_be_hashed(self) -> None:
         emp = Employee.model_validate(employee("9.5"))
         assert hash(emp) == hash(Employee.model_validate(employee("9.5")))
