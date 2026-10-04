@@ -12,6 +12,7 @@ from pybiotime._core import (
     parse_page,
     resolve_timezone,
 )
+from pybiotime.enums import PunchState, ResignType
 from pybiotime.errors import (
     APIError,
     AuthenticationError,
@@ -192,3 +193,9 @@ class TestDatetimes:
 
 def test_merge_params_drops_none() -> None:
     assert merge_params({"a": 1, "b": None}, {"c": True}) == {"a": "1", "c": "true"}
+
+
+def test_merge_params_sends_enum_values() -> None:
+    # Before Python 3.11, str() of an IntEnum member is its name, not its number.
+    params = merge_params({"resign_type": ResignType.QUIT, "punch_state": PunchState.CHECK_OUT})
+    assert params == {"resign_type": "1", "punch_state": "1"}
