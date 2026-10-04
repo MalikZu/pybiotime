@@ -1,0 +1,20 @@
+{
+  "departments": [
+    {"id": 3, "dept_code": "OPS", "dept_name": "Operations",
+     "parent_dept": {"id": 2, "dept_code": "HQ", "dept_name": "Head office", "parent_dept": null}}
+  ],
+  "areas": [
+    {"id": 2, "area_code": "WH", "area_name": "Warehouse",
+     "parent_area": {"id": 1, "area_code": "1", "area_name": "Head office", "parent_area": null},
+     "parent_area_name": "Head office"}
+  ],
+  "positions": [
+    {"id": 5, "position_code": "TECH", "position_name": "Technician",
+     "parent_position": null, "parent_position_name": null}
+  ],
+  "resigns": [
+    {"id": 5, "resign_date": "2026-06-04", "resign_type": 1, "disableatt": true,
+     "employee": {"id": 41, "emp_code": "1001", "first_name": "Test", "last_name": "User"},
+     "first_name": "Test", "last_name": "User"}
+  ]
+}
