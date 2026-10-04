@@ -25,6 +25,20 @@ def test_import_punches():
 
 The same `transport()` works with `AsyncBioTimeClient`.
 
+## Personnel
+
+Seed departments, areas, positions and employees, then test code that manages them:
+
+```python
+fake = FakeBioTime()
+ops = fake.add_department(code="OPS", name="Operations")
+site = fake.add_area(code="DXB", name="Dubai office")
+fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site], first_name="Sara")
+```
+
+The fake checks what a real server checks: required fields, unique codes, and ids
+that must exist. Failures raise `BadRequestError` with `field_errors`, as on a real server.
+
 ## What it imitates
 
 - Token and JWT logins, with HTTP 400 for a wrong password.

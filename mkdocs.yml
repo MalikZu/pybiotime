@@ -30,6 +30,7 @@ nav:
   - Getting started: getting-started.md
   - Authentication: authentication.md
   - Reading punches: punches.md
+  - Employees and structure: personnel.md
   - Errors: errors.md
   - Testing your code: testing.md
   - Contributing: contributing.md
