@@ -55,7 +55,8 @@ def tidy(text: str, filename: Path) -> str:
             text=True,
             check=True,
         ).stdout
-    return text
+    # Exactly one newline at the end, as the end-of-file hook wants.
+    return text.rstrip("\n") + "\n"
 
 
 def expected_files() -> dict[Path, str]:
