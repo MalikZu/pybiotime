@@ -9,11 +9,11 @@ import os
 import secrets
 import time
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
-from pybiotime import BioTimeClient, BioTimeError, NotFoundError, ResignType
+from pybiotime import APIError, BioTimeClient, BioTimeError, NotFoundError, ResignType
 from tests.contract.test_live import URL, live_auth
 
 pytestmark = pytest.mark.skipif(not URL, reason="BIOTIME_URL is not set")
@@ -60,6 +60,8 @@ def test_resigns_read(client: BioTimeClient) -> None:
 )
 def test_round_trip(client: BioTimeClient) -> None:
     tag = "PYBT" + secrets.token_hex(3).upper()
+    # A code to rename to. Clean-up looks for both, in case a rename sticks.
+    other = tag + "X"
     employee_ids: list[int] = []
     resign_ids: list[int] = []
     try:
@@ -87,36 +89,62 @@ def test_round_trip(client: BioTimeClient) -> None:
         )
         assert updated.position_id == position.id
 
+        # BioTime 9.5 keeps department and employee codes, and says so only by
+        # answering with the old one. update() must turn that into an error.
+        with pytest.raises(APIError, match="kept"):
+            client.departments.update(dept.id, code=other)
+        assert client.departments.get(dept.id).dept_code == tag
+        with pytest.raises(APIError, match="kept"):
+            client.employees.update(emp.id, emp_code=other)
+        assert client.employees.get(emp.id).emp_code == tag
+        # Area and position codes do change. Rename them back for the clean-up.
+        for manager, item, field in (
+            (client.areas, area, "area_code"),
+            (client.positions, position, "position_code"),
+        ):
+            assert getattr(manager.update(item.id, code=other), field) == other
+            assert getattr(manager.update(item.id, code=tag), field) == tag
+
         resign = client.resigns.create(
             emp.id, resign_date=date.today(), resign_type=ResignType.QUIT, reason="pybiotime test"
         )
         resign_ids.append(resign.id)
         assert resign.employee.id == emp.id
+        # An update sends only some fields. The others must keep their values.
+        earlier = date.today() - timedelta(days=1)
+        moved = client.resigns.update(resign.id, resign_date=earlier)
+        assert moved.resign_date == earlier
+        assert moved.resign_type == ResignType.QUIT
+        assert moved.disableatt is True
         client.resigns.reinstate([resign.id])
         assert all(r.id != resign.id for r in client.resigns.list(employee_id=emp.id))
     finally:
-        left = clean_up(client, tag, employee_ids, resign_ids)
+        left = clean_up(client, (tag, other), employee_ids, resign_ids)
         assert not left, f"Delete these test records by hand: {left}"
 
 
 def clean_up(
-    client: BioTimeClient, tag: str, employee_ids: list[int], resign_ids: list[int]
+    client: BioTimeClient, codes: tuple[str, ...], employee_ids: list[int], resign_ids: list[int]
 ) -> list[str]:
     """Delete what the round trip made, then return what is still there.
 
     Every step runs even when an earlier one failed, and lookups read raw JSON, so a bug
-    in the code under test cannot stop the clean-up. Records are also found by code, in
-    case a step failed before their id was known.
+    in the code under test cannot stop the clean-up. Records are also found by each of
+    `codes`, in case a step failed before their id was known or a rename stuck.
     """
-    employees = {*employee_ids, *ids(client, "employees", "emp_code", tag)}
+
+    def by_code(kind: str, key: str) -> list[int]:
+        return [i for code in codes for i in ids(client, kind, key, code)]
+
+    employees = {*employee_ids, *by_code("employees", "emp_code")}
     resigns = {*resign_ids, *(r for e in employees for r in ids(client, "resigns", "employee", e))}
     paths = [f"resigns/{r}/" for r in resigns] + [f"employees/{e}/" for e in employees]
-    paths += [f"{kind}/{i}/" for kind, key in CODED for i in ids(client, kind, key, tag)]
+    paths += [f"{kind}/{i}/" for kind, key in CODED for i in by_code(kind, key)]
     for path in paths:
         delete(client, path)
     left = {path for path in paths if exists(client, path)}
     for kind, key in (("employees", "emp_code"), *CODED):
-        left.update(f"{kind}/{i}/" for i in ids(client, kind, key, tag))
+        left.update(f"{kind}/{i}/" for i in by_code(kind, key))
     return sorted(left)
 
 
