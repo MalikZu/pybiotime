@@ -13,6 +13,7 @@ from pybiotime import (
     TokenAuth,
 )
 from pybiotime.testing import VERSIONS, FakeBioTime
+from pybiotime.testing._personnel import _PROFILES
 
 BASE = "http://biotime.test"
 
@@ -318,3 +319,18 @@ def test_list_filters_on_the_values_shown(fake: FakeBioTime) -> None:
     assert [e.emp_code for e in without_app] == ["1001"]
     assert as_bool == without_app
     assert fake.requests[-1].params["app_status"] == "0"
+
+
+def test_attendance_flags_written_on_8x_read_back(fake: FakeBioTime) -> None:
+    if not _PROFILES[fake.version].flat:
+        pytest.skip("only 8.x sends the flags at the top level")
+    ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
+    flags = {"enable_att": False, "enable_overtime": False}
+    with client_for(fake) as client:
+        emp = client.employees.create("1001", department_id=ops, area_ids=[site], fields=flags)
+        client.employees.upsert("1001", department_id=ops, area_ids=[site], fields=flags)
+    assert emp.attendance is not None
+    assert emp.attendance.enable_attendance is False
+    assert emp.attendance.enable_overtime is False
+    assert emp.attendance.enable_holiday is True
+    assert writes(fake, "PATCH") == 0

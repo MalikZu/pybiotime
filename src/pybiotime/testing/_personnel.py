@@ -390,7 +390,8 @@ def _as_8x(employee: dict[str, Any]) -> dict[str, Any]:
     for key in ("format_name", "full_name", "photo", "update_time"):
         employee.pop(key, None)
     for flat, nested in _FLAT_ATTENDANCE.items():
-        employee[flat] = flags[nested]
+        # A flag written to the employee wins over the default.
+        employee.setdefault(flat, flags[nested])
     for relation, key in _RELATION_NAMES.items():
         ref = employee.get(relation)
         employee[key] = ref[key] if ref else None
