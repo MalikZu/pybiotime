@@ -19,13 +19,16 @@ from pybiotime._async.personnel import (
 )
 from pybiotime._async.resources import AsyncTerminals, AsyncTransactions
 from pybiotime._concurrency import AsyncLock, async_sleep
-from pybiotime._core import decode_response, resolve_timezone
+from pybiotime._core import decode_response, parse_page, resolve_timezone
 from pybiotime._version import __version__
 from pybiotime.auth import Auth
+from pybiotime.compat import ServerInfo, docs_title, employee_shape, guess_version
 from pybiotime.errors import (
     APIError,
     AuthenticationError,
+    FaultPageError,
     LoginSuspendedError,
+    NotFoundError,
     TransportError,
 )
 
@@ -118,6 +121,35 @@ class AsyncBioTimeClient:
         error handling work as for every other call.
         """
         return await self._request(method.upper(), path, params=params, json=json)
+
+    async def server_info(self) -> ServerInfo:
+        """Find out which BioTime version this is, and whether it has the resign API.
+
+        No endpoint reports the version, so this reads three signals: the title of the
+        public ``/api/docs/`` page, how one employee's attendance flags are shaped, and
+        whether the resign endpoint answers. It makes three small requests.
+        """
+        title = None
+        page = await self._send("GET", "/api/docs/", auth=None)
+        if page.status_code == 200:
+            title = docs_title(page.text)
+
+        body = await self._request("GET", self.employees.path, params={"page_size": "1"})
+        items = parse_page(body, method="GET", path=self.employees.path).items
+        shape = employee_shape(items[0]) if items else None
+
+        try:
+            await self._request("GET", self.resigns.path, params={"page_size": "1"})
+            has_resigns = True
+        except (FaultPageError, NotFoundError):
+            has_resigns = False
+
+        return ServerInfo(
+            version=guess_version(title, shape, has_resigns),
+            docs_title=title,
+            employee_shape=shape,
+            has_resigns=has_resigns,
+        )
 
     async def _request(
         self,
