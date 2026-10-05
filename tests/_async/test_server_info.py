@@ -4,6 +4,12 @@ from pybiotime import AsyncBioTimeClient, FaultPageError, TokenAuth
 from pybiotime.testing import VERSIONS, FakeBioTime
 
 BASE = "http://biotime.test"
+TITLES = {
+    "8.0": "BIOTIME API DOCS",
+    "8.5": "BIOTIME API DOCS",
+    "9.0": "ZKBio Time API DOCS",
+    "9.5": "BioTime 9.5 API DOCS",
+}
 
 
 def client_for(fake: FakeBioTime) -> AsyncBioTimeClient:
@@ -24,6 +30,7 @@ async def test_detects_each_version(version: str) -> None:
     async with client_for(seeded(version)) as client:
         info = await client.server_info()
     assert info.version == version
+    assert info.docs_title == TITLES[version]
     assert info.employee_shape == ("flat" if version.startswith("8") else "nested")
     assert info.has_resigns is (version in ("8.5", "9.5"))
 
