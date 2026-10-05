@@ -10,7 +10,7 @@
       "terminal_name": null,
       "fw_ver": null,
       "push_ver": null,
-      "state": 1,
+      "state": "1",
       "terminal_tz": 8,
       "area": {
         "id": 1,
@@ -136,8 +136,6 @@
           "area_name": "Warehouse"
         }
       ],
-      "self_password": "pbkdf2_sha256$390000$not-a-real-hash",
-      "flow_role": [],
       "format_name": "1001 Test",
       "full_name": "Test User",
       "photo": "",
@@ -168,8 +166,7 @@
         "dept_code": "HQ",
         "dept_name": "Head office",
         "parent_dept": null
-      },
-      "parent_dept_name": "Head office"
+      }
     }
   ],
   "areas": [
