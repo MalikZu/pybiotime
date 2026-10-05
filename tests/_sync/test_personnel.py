@@ -60,7 +60,7 @@ class TestDepartments:
         assert ops is not None
         assert ops.dept_name == "Operations"
         assert ops.parent_dept is not None
-        assert ops.parent_dept.dept_code == "HQ"
+        assert ops.parent_dept.dept_name == "Head office"
         assert missing is None
 
     def test_create_update_delete(self, fake: FakeBioTime) -> None:
@@ -87,7 +87,7 @@ class TestDepartments:
             moved = client.departments.upsert("FIN", "Finance", parent_id=dept_id(fake, "HQ"))
         assert same.id == created.id
         assert moved.parent_dept is not None
-        assert moved.parent_dept.dept_code == "HQ"
+        assert moved.parent_dept.dept_name == "Head office"
         creates = [r for r in fake.requests if r.method == "POST" and "departments" in r.path]
         assert len(creates) == 1
         assert writes(fake, "PATCH") == 1
@@ -334,3 +334,22 @@ def test_attendance_flags_written_on_8x_read_back(fake: FakeBioTime) -> None:
     assert emp.attendance.enable_overtime is False
     assert emp.attendance.enable_holiday is True
     assert writes(fake, "PATCH") == 0
+
+
+def test_raw_answers_follow_the_version(fake: FakeBioTime) -> None:
+    profile = _PROFILES[fake.version]
+    body = {"emp_code": "1001", "department": dept_id(fake, "OPS"), "area": [area_id(fake, "1")]}
+    with client_for(fake) as client:
+        answer = client.request("POST", "/personnel/api/employees/", json=body)
+        listed = client.request("GET", "/personnel/api/departments/", params={"dept_code": "OPS"})
+    # Write answers as the manuals show them: 8.x adds flat flags and drops update_time,
+    # and 8.x and 9.0 add the password hash.
+    assert ("update_time" in answer) is not profile.flat
+    assert ("enable_att" in answer) is profile.flat
+    assert answer.get("self_password") == profile.password_hash
+    ops = listed["data"][0]
+    if profile.flat:
+        assert ops["parent_dept"] == dept_id(fake, "HQ")
+        assert ops["parent_dept_name"] == "Head office"
+    else:
+        assert ops["parent_dept"]["dept_code"] == "HQ"

@@ -30,8 +30,8 @@ and reporting the result helps a lot.
   temperatures or masks send 255 for them. Both read as `None`.
 - **Loose types.** Numbers come as strings, booleans as `0`/`1`, `"Yes"`/`"No"` or `"-"`,
   and empty text as `""` or `null`. Models accept all of these.
-- **Password hashes.** 8.x returns employees' self-service password as a hash; 9.5 leaves
-  it out. pybiotime keeps it out of `repr()` either way.
+- **Password hashes.** 8.x returns employees' self-service password as a hash; 9.x leaves
+  it out of reads. pybiotime keeps it out of `repr()` either way.
 
 ## Which version is this server?
 
@@ -51,8 +51,11 @@ check `has_resigns` directly.
 
 ## Testing against older versions
 
-`FakeBioTime(version="8.0")` answers in the 8.0 shape: flat employees, no resign API, and
-the 8.x docs title. Run your tests once per version to catch shape assumptions:
+`FakeBioTime(version="8.0")` answers as the 8.0 manual shows: flat employees with a
+password hash, departments that give their parent as an id and a name, no resign API,
+and the 8.x docs title. `"8.5"` adds the resign API. `"9.0"` sends nested employees and
+ZKBio Time punches, without the resign API. Other records keep the 9.5 shape. Run your
+tests once per version to catch shape assumptions:
 
 ```python
 import pytest
