@@ -148,7 +148,7 @@ class BioTimeClient:
             has_resigns = False
 
         return ServerInfo(
-            version=guess_version(title, shape, has_resigns),
+            version=guess_version(title, shape),
             docs_title=title,
             employee_shape=shape,
             has_resigns=has_resigns,
