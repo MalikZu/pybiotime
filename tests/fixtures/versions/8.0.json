@@ -1,0 +1,155 @@
+{
+  "docs_title": "BIOTIME API DOCS",
+  "has_resigns": false,
+  "terminals": [
+    {
+      "id": 7,
+      "sn": "TEST0000001",
+      "ip_address": "192.0.2.10",
+      "alias": "Main gate",
+      "terminal_name": null,
+      "fw_ver": null,
+      "push_ver": null,
+      "state": "1",
+      "terminal_tz": 8,
+      "area": {
+        "id": 1,
+        "area_code": "1",
+        "area_name": "Head office"
+      },
+      "last_activity": "2026-10-03 23:23:15",
+      "user_count": 12,
+      "fp_count": 10,
+      "face_count": 4,
+      "palm_count": 0,
+      "transaction_count": 2,
+      "push_time": null,
+      "transfer_time": "00:00;14:05",
+      "transfer_interval": 10,
+      "is_attendance": 1,
+      "area_name": "Head office"
+    }
+  ],
+  "transactions": [
+    {
+      "id": 101,
+      "emp": null,
+      "emp_code": "1001",
+      "first_name": "Test",
+      "last_name": "User",
+      "department": "Operations",
+      "position": null,
+      "punch_time": "2026-07-28 08:00:00",
+      "punch_state": "0",
+      "punch_state_display": "Check In",
+      "verify_type": 1,
+      "verify_type_display": "Fingerprint",
+      "work_code": null,
+      "gps_location": "",
+      "area_alias": "Head office",
+      "terminal_sn": "TEST0000001",
+      "temperature": 0.0,
+      "is_mask": "-",
+      "terminal_alias": "Main gate",
+      "upload_time": "2026-07-28 08:00:05"
+    },
+    {
+      "id": 102,
+      "emp": null,
+      "emp_code": "1002",
+      "first_name": "Other",
+      "last_name": "Person",
+      "department": "Operations",
+      "position": null,
+      "punch_time": "2026-06-05 17:01:00",
+      "punch_state": "1",
+      "punch_state_display": "Check Out",
+      "verify_type": 15,
+      "verify_type_display": "Face",
+      "work_code": null,
+      "gps_location": "",
+      "area_alias": "Head office",
+      "terminal_sn": "TEST0000001",
+      "temperature": 0.0,
+      "is_mask": "-",
+      "terminal_alias": "Main gate",
+      "upload_time": "2026-09-16 10:00:00"
+    }
+  ],
+  "employees": [
+    {
+      "id": 41,
+      "emp_code": "1001",
+      "first_name": "Test",
+      "last_name": "User",
+      "nickname": "",
+      "device_password": "4321",
+      "card_no": "99887766",
+      "hire_date": "2026-10-01",
+      "gender": "F",
+      "birthday": null,
+      "verify_mode": -1,
+      "emp_type": 1,
+      "contact_tel": "",
+      "office_tel": "",
+      "mobile": "",
+      "national": "",
+      "city": "",
+      "address": "",
+      "postcode": "",
+      "email": "",
+      "enroll_sn": "",
+      "ssn": "",
+      "religion": "",
+      "dev_privilege": 0,
+      "app_status": 0,
+      "app_role": 1,
+      "department": 3,
+      "dept_name": "Operations",
+      "position": 5,
+      "position_name": "Technician",
+      "area": [
+        1,
+        2
+      ],
+      "area_name": "Head office,Warehouse",
+      "enable_att": true,
+      "enable_overtime": false,
+      "enable_holiday": true,
+      "self_password": "pbkdf2_sha256$36000$not-a-real-hash",
+      "flow_role": []
+    }
+  ],
+  "departments": [
+    {
+      "id": 3,
+      "dept_code": "OPS",
+      "dept_name": "Operations",
+      "parent_dept": 2,
+      "parent_dept_name": "Head office"
+    }
+  ],
+  "areas": [
+    {
+      "id": 2,
+      "area_code": "WH",
+      "area_name": "Warehouse",
+      "parent_area": {
+        "id": 1,
+        "area_code": "1",
+        "area_name": "Head office"
+      },
+      "parent_area_name": "Head office"
+    }
+  ],
+  "positions": [
+    {
+      "id": 5,
+      "position_code": "TECH",
+      "position_name": "Technician",
+      "parent_position": null,
+      "parent_position_name": null
+    }
+  ],
+  "resigns": []
+}
