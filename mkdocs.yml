@@ -32,5 +32,6 @@ nav:
   - Reading punches: punches.md
   - Employees and structure: personnel.md
   - Errors: errors.md
+  - BioTime versions: versions.md
   - Testing your code: testing.md
   - Contributing: contributing.md

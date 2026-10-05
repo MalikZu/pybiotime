@@ -6,14 +6,16 @@ Typed Python client for the ZKTeco BioTime REST API.
 >
 > pybiotime is an unofficial project. It is not affiliated with or endorsed by ZKTeco.
 
-## Planned
+## What it does
 
-- BioTime 9.5, with 9.0 and 8.5 support where their APIs overlap.
-- Sync and async clients with the same interface.
-- Devices, employees, departments, areas, positions and punch transactions.
+- Talks to BioTime 9.5, 9.0, 8.5 and 8.0 with the same models. Only 9.5 is tested
+  against a live server so far.
+- Sync and async clients with the same methods.
+- Devices, punch transactions, employees, departments, areas, positions and resignations.
+- Reads new punches without losing late uploads from offline devices.
 - Automatic pagination, typed models and clear errors.
 - An in-memory fake server for testing code that uses pybiotime.
-- Python 3.10 to 3.14.
+- Python 3.10 to 3.14. Depends only on `httpx` and `pydantic` (plus `tzdata` on Windows).
 
 ## Contributing
 
