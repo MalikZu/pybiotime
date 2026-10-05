@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
+
+from pydantic import field_validator
 
 from pybiotime.models._base import (
     BioTimeDateTime,
@@ -46,8 +48,18 @@ class Transaction(BioTimeModel):
     last_name: str | None = None
     emp: LenientInt = None
     terminal: LenientInt = None
+    #: ``None`` when the device does not check temperatures.
     temperature: LenientFloat = None
     is_mask: LenientBool = None
     gps_location: str | None = None
     longitude: LenientFloat = None
     latitude: LenientFloat = None
+
+    @field_validator("temperature", mode="before")
+    @classmethod
+    def _no_reading(cls, value: Any) -> Any:
+        # BioTime sends 255 when temperature checking is off: it is not a reading.
+        try:
+            return None if float(value) == 255 else value
+        except (TypeError, ValueError):
+            return value
