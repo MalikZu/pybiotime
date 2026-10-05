@@ -22,8 +22,9 @@ and reporting the result helps a lot.
   to the ids. They move into `employee.department`, `employee.position` and `employee.area`.
   8.x departments give their parent as an id with `parent_dept_name`; it moves into
   `department.parent_dept`.
-- **The resign API** exists on 8.5 and 9.5 only. On other versions, resign calls raise
-  `FaultPageError`, because the server answers with an HTML "Page not found" page.
+- **The resign API** is documented for 8.5 and 9.5, but servers do not always match their
+  manuals. Where it is missing, resign calls raise `FaultPageError`, because the server
+  answers with an HTML "Page not found" page. Check `server_info().has_resigns`.
 - **Page size.** Servers take `page_size`; the 8.0 and 9.0 manuals document `limit`.
   pybiotime sends both, and servers ignore the one they do not know.
 - **No temperature check.** The 8.0 and 9.0 manuals say devices that do not check
@@ -35,19 +36,20 @@ and reporting the result helps a lot.
 
 ## Which version is this server?
 
-No endpoint reports the version. `server_info()` reads three signals and makes a best guess:
+No endpoint reports the version. `server_info()` reads three signals:
 
 ```python
 info = bt.server_info()
-info.version  # "9.5", or "8.x" when only the generation is clear
+info.version  # "9.5" from the docs title, "8.x" for flat employees, otherwise None
 info.has_resigns  # whether the resign API exists
-info.employee_shape  # "nested" (9.x) or "flat" (8.x); None without employees
-info.docs_title  # title of the public /api/docs/ page
+info.employee_shape  # "flat" (8.x) or "nested"; None without employees
+info.docs_title  # title of the public /api/docs/ page, or None
 ```
 
 The signals are the title of the public API docs page, the shape of one employee, and
-whether the resign endpoint answers. Treat `version` as a guess. To decide what to call,
-check `has_resigns` directly.
+whether the resign endpoint answers. `version` gives a number only when the docs title
+shows one: some 8.x servers nest employees as 9.x does, and the resign API is not tied
+to one version. To decide what to call, check `has_resigns` directly.
 
 ## Testing against older versions
 

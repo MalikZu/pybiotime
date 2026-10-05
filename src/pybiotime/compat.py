@@ -32,11 +32,13 @@ EmployeeShape = Literal["nested", "flat"]
 class ServerInfo:
     """What a BioTime server shows about itself. See `BioTimeClient.server_info`."""
 
-    #: Best guess, such as "9.5", or "8.x" when only the generation is clear.
+    #: The version in the docs page title, such as "9.5"; "8.x" when only flat employees
+    #: show the generation; ``None`` when nothing tells.
     version: str | None
     #: Title of the public API docs page, if the server serves one.
     docs_title: str | None
-    #: "nested" (9.x) or "flat" (8.x) attendance flags; ``None`` without employees.
+    #: "flat" (8.x) or "nested" (9.x and later 8.x builds) attendance flags; ``None``
+    #: without employees.
     employee_shape: EmployeeShape | None
     #: Whether the resign API exists. BioTime 8.5 and 9.5 have it.
     has_resigns: bool
@@ -127,21 +129,24 @@ def page_params(size: int) -> dict[str, str]:
     return {"page_size": str(size), "limit": str(size)}
 
 
-_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-_VERSION = re.compile(r"\b(\d+\.\d+)\b")
+_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_TITLE = re.compile(r"<title(?:\s[^>]*)?>(.*?)</title\s*>", re.IGNORECASE | re.DOTALL)
+# The number right after the product name, as in "BioTime 9.5" or "ZKBioTime8.0".
+_VERSION = re.compile(r"(?:biotime|zkbio\s*time)\s*v?\s*([0-9]+\.[0-9]+)", re.IGNORECASE)
 
 
 def docs_title(page: str) -> str | None:
-    """The title of the server's public ``/api/docs/`` page.
+    """The title of the server's public ``/api/docs/`` page, or ``None`` for another page.
 
     It is "BioTime 9.5 API DOCS" on a live 9.5 server. The manuals show
-    "BIOTIME API DOCS" for 8.x and "ZKBio Time API DOCS" for 9.0.
+    "BIOTIME API DOCS" for 8.x and "ZKBio Time API DOCS" for 9.0. Other titles, such as
+    that of the "Page not found" page BioTime serves for unknown paths, give ``None``.
     """
-    match = _TITLE.search(page)
-    if match is None:
-        return None
-    title = " ".join(html.unescape(match.group(1)).split())
-    return title or None
+    for match in _TITLE.finditer(_COMMENT.sub("", page)):
+        title = " ".join(html.unescape(match.group(1)).split())
+        if "api docs" in title.lower():
+            return title
+    return None
 
 
 def employee_shape(employee: Any) -> EmployeeShape | None:
@@ -155,29 +160,16 @@ def employee_shape(employee: Any) -> EmployeeShape | None:
     return None
 
 
-def guess_version(
-    title: str | None, shape: EmployeeShape | None, has_resigns: bool | None
-) -> str | None:
-    """Best guess at the BioTime version from what the server shows.
+def guess_version(title: str | None, shape: EmployeeShape | None) -> str | None:
+    """The BioTime version, as far as what the server shows can tell.
 
-    A version number in the docs title wins. Otherwise the employee shape and the
-    resign API decide, as the manuals describe them: 8.0 flat without resigns,
-    8.5 flat with resigns, 9.0 nested without resigns, 9.5 nested with resigns.
-    Returns "8.x" or "9.x" when only the generation is clear, and ``None`` when
-    nothing is.
+    A version number after the product name in the docs title gives it. Otherwise flat
+    attendance flags show an 8.x server, and nothing else is certain: some 8.x servers
+    nest the flags as 9.x does, the product names overlap, and the resign API is not
+    tied to one version.
     """
     if title:
         number = _VERSION.search(title)
         if number:
             return number.group(1)
-    if shape is None:
-        if title and "zkbio" in title.lower():
-            return "9.x"
-        if title and "biotime" in title.lower():
-            return "8.x"
-        return None
-    generation = "8" if shape == "flat" else "9"
-    if has_resigns is None:
-        return f"{generation}.x"
-    minor = "5" if has_resigns else "0"
-    return f"{generation}.{minor}"
+    return "8.x" if shape == "flat" else None

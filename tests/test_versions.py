@@ -208,27 +208,52 @@ def test_fake_punches_carry_the_version_fields(version: str) -> None:
 
 
 class TestVersionSignals:
-    @pytest.mark.parametrize("version", VERSIONS)
-    def test_guess_from_the_fixture(self, version: str) -> None:
+    @pytest.mark.parametrize(
+        ("version", "expected"), [("8.0", "8.x"), ("8.5", "8.x"), ("9.0", None), ("9.5", "9.5")]
+    )
+    def test_guess_from_the_fixture(self, version: str, expected: str | None) -> None:
         data = payloads(version)
         page = f"<html><head><title>{data['docs_title']}</title></head></html>"
         shape = employee_shape(data["employees"][0])
         assert shape == ("flat" if version.startswith("8") else "nested")
-        assert guess_version(docs_title(page), shape, data["has_resigns"]) == version
+        assert guess_version(docs_title(page), shape) == expected
 
     def test_title_number_wins(self) -> None:
-        assert guess_version("BioTime 9.5 API DOCS", "flat", False) == "9.5"
+        assert guess_version("BioTime 9.5 API DOCS", "flat") == "9.5"
 
-    def test_generation_only(self) -> None:
-        assert guess_version("BIOTIME API DOCS", None, None) == "8.x"
-        assert guess_version("ZKBio Time API DOCS", None, None) == "9.x"
-        assert guess_version(None, "nested", None) == "9.x"
-        assert guess_version(None, None, None) is None
+    def test_only_flat_employees_tell_the_generation(self) -> None:
+        # Some 8.x servers nest the flags too, and the product names overlap.
+        assert guess_version(None, "flat") == "8.x"
+        assert guess_version(None, "nested") is None
+        assert guess_version("BIOTIME API DOCS", None) is None
+        assert guess_version("ZKBio Time API DOCS", None) is None
+        assert guess_version(None, None) is None
+
+    @pytest.mark.parametrize(
+        ("title", "expected"),
+        [
+            ("BioTime V9.5 API DOCS", "9.5"),
+            ("ZKBioTime8.0 API DOCS", "8.0"),
+            ("REST 1.0 | BioTime 9.5 API DOCS", "9.5"),
+            ("BioTime \u0669.\u0665 API DOCS", None),
+        ],
+    )
+    def test_version_follows_the_product_name(self, title: str, expected: str | None) -> None:
+        assert guess_version(title, None) == expected
 
     def test_title_parsing(self) -> None:
         page = "<HTML><TITLE>\n  BioTime   9.5 API DOCS </TITLE></HTML>"
         assert docs_title(page) == "BioTime 9.5 API DOCS"
         assert docs_title("<html>no title</html>") is None
+        assert docs_title("<title>BioTime 9.5 API DOCS</title >") == "BioTime 9.5 API DOCS"
+        hidden = "<!-- <title>old 8.0 API DOCS</title> --><title>BioTime 9.5 API DOCS</title>"
+        assert docs_title(hidden) == "BioTime 9.5 API DOCS"
+        icon = "<svg><title>icon 1.0</title></svg><title>BioTime 9.5 API DOCS</title>"
+        assert docs_title(icon) == "BioTime 9.5 API DOCS"
+
+    def test_other_pages_have_no_docs_title(self) -> None:
+        assert docs_title("<html><head><title>Page not found</title></head></html>") is None
+        assert docs_title("<titlex>BioTime 9.5 API DOCS</titlex>") is None
 
     def test_shape_of_something_else(self) -> None:
         assert employee_shape({"id": 1}) is None
