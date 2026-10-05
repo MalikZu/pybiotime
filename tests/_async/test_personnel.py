@@ -10,14 +10,15 @@ from pybiotime import (
     ResignType,
     TokenAuth,
 )
-from pybiotime.testing import FakeBioTime
+from pybiotime.testing import VERSIONS, FakeBioTime
 
 BASE = "http://biotime.test"
 
 
-@pytest.fixture
-def fake() -> FakeBioTime:
-    server = FakeBioTime()
+@pytest.fixture(params=VERSIONS)
+def fake(request: pytest.FixtureRequest) -> FakeBioTime:
+    """A seeded fake server, once per BioTime version: every test runs against each."""
+    server = FakeBioTime(version=request.param)
     hq = server.add_department(code="HQ", name="Head office")
     server.add_department(code="OPS", name="Operations", parent_id=hq)
     server.add_department(code="OPS2", name="Operations two")
@@ -29,6 +30,11 @@ def fake() -> FakeBioTime:
 
 def client_for(fake: FakeBioTime) -> AsyncBioTimeClient:
     return AsyncBioTimeClient(BASE, auth=TokenAuth("api", "secret"), transport=fake.transport())
+
+
+def needs_resigns(fake: FakeBioTime) -> None:
+    if not fake.has_resigns:
+        pytest.skip(f"BioTime {fake.version} has no resign API")
 
 
 def writes(fake: FakeBioTime, method: str) -> int:
@@ -203,6 +209,7 @@ class TestEmployees:
 class TestResigns:
     @pytest.mark.anyio
     async def test_resign_and_reinstate(self, fake: FakeBioTime) -> None:
+        needs_resigns(fake)
         async with client_for(fake) as client:
             emp = await client.employees.create(
                 "1001", department_id=dept_id(fake, "OPS"), area_ids=[area_id(fake, "1")]
@@ -245,6 +252,7 @@ async def test_create_without_id_in_the_answer_is_read_back(fake: FakeBioTime, k
 
 @pytest.mark.anyio
 async def test_employee_and_resign_without_id_in_the_answer(fake: FakeBioTime) -> None:
+    needs_resigns(fake)
     fake.creates_without_id = {"employees", "resigns"}
     async with client_for(fake) as client:
         emp = await client.employees.create(
@@ -285,6 +293,7 @@ async def test_spaces_around_codes_do_not_count(fake: FakeBioTime) -> None:
 async def test_resign_read_back_checks_the_employee(
     fake: FakeBioTime, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    needs_resigns(fake)
     fake.creates_without_id = {"resigns"}
     ops, site = dept_id(fake, "OPS"), area_id(fake, "1")
     alice = fake.add_employee(emp_code="1001", department_id=ops, area_ids=[site])
