@@ -45,7 +45,7 @@ class AsyncPager(Generic[T]):
 
     async def pages(self) -> AsyncIterator[Page[T]]:
         """Yield each page in turn, following the server's next links."""
-        params: Params = {**self._params, "page_size": str(self._page_size)}
+        params: Params = {**self._params, **_size(self._page_size)}
         guard = PageGuard()
         while True:
             raw = parse_page(
@@ -65,7 +65,7 @@ class AsyncPager(Generic[T]):
 
     async def first_page(self) -> Page[T]:
         """Fetch only the first page."""
-        params = {**self._params, "page_size": str(self._page_size)}
+        params = {**self._params, **_size(self._page_size)}
         raw = parse_page(
             await self._client._request("GET", self._path, params=params),
             method="GET",
@@ -88,6 +88,12 @@ class AsyncPager(Generic[T]):
         return raw.count if raw.count is not None else len(raw.items)
 
     async def _small_page(self) -> RawPage:
-        params = {**self._params, "page_size": "1"}
+        params = {**self._params, **_size(1)}
         body = await self._client._request("GET", self._path, params=params)
         return parse_page(body, method="GET", path=self._path)
+
+
+def _size(size: int) -> dict[str, str]:
+    # BioTime takes page_size. The 9.0 manual documents limit instead, and servers that
+    # do not know a parameter ignore it, so send both.
+    return {"page_size": str(size), "limit": str(size)}
