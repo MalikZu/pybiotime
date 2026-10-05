@@ -132,7 +132,8 @@ class BioTimeClient:
         whether the resign endpoint answers. It makes three small requests.
         """
         title = None
-        page = self._send("GET", "/api/docs/", auth=None)
+        # The docs page is HTML only: asked for JSON, it answers 406.
+        page = self._send("GET", "/api/docs/", auth=None, accept="text/html")
         if page.status_code == 200:
             title = docs_title(page.text)
 
@@ -226,8 +227,11 @@ class BioTimeClient:
         params: dict[str, Any] | None = None,
         json: Any = None,
         auth: str | None,
+        accept: str | None = None,
     ) -> httpx.Response:
-        headers = {"Authorization": auth} if auth else None
+        headers = {"Authorization": auth} if auth else {}
+        if accept:
+            headers["Accept"] = accept
         attempt = 0
         while True:
             started = time.monotonic()

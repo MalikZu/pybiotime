@@ -54,6 +54,7 @@ class RecordedRequest:
     params: dict[str, str]
     authorization: str | None
     json: Any = None
+    accept: str | None = None
 
 
 @dataclass
@@ -174,6 +175,7 @@ class FakeBioTime(PersonnelData):
             dict(request.url.params),
             request.headers.get("Authorization"),
             body,
+            request.headers.get("Accept"),
         )
         self.requests.append(recorded)
         response = self._respond(recorded)
@@ -192,6 +194,8 @@ class FakeBioTime(PersonnelData):
             return self._login(request.method, path, request.json)
         html = {"Content-Type": "text/html"}
         if path == "/api/docs/":
+            if "html" not in (request.accept or "") and "*/*" not in (request.accept or ""):
+                return _detail(406, "Could not satisfy the request Accept header.")
             title = _DOCS_TITLES[self.version].encode()
             page = b"<!DOCTYPE html><html><head><title>" + title + b"</title></head></html>"
             return httpx.Response(200, content=page, headers=html)
