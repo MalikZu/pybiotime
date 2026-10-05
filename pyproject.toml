@@ -33,6 +33,7 @@ dependencies = [
 pybiotime = "pybiotime.cli:main"
 
 [project.urls]
+Documentation = "https://malikzu.github.io/pybiotime/"
 Source = "https://github.com/MalikZu/pybiotime"
 Issues = "https://github.com/MalikZu/pybiotime/issues"
 
