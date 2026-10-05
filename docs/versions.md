@@ -24,8 +24,8 @@ and reporting the result helps a lot.
   `department.parent_dept`.
 - **The resign API** exists on 8.5 and 9.5 only. On other versions, resign calls raise
   `FaultPageError`, because the server answers with an HTML "Page not found" page.
-- **Page size.** Servers take `page_size`; the 9.0 manual documents `limit`. pybiotime
-  sends both, and servers ignore the one they do not know.
+- **Page size.** Servers take `page_size`; the 8.0 and 9.0 manuals document `limit`.
+  pybiotime sends both, and servers ignore the one they do not know.
 - **No temperature check.** The 8.0 and 9.0 manuals say devices that do not check
   temperatures or masks send 255 for them. Both read as `None`.
 - **Loose types.** Numbers come as strings, booleans as `0`/`1`, `"Yes"`/`"No"` or `"-"`,
@@ -68,4 +68,5 @@ def fake(request):
 ```
 
 Real servers do not always match their manuals. `resign_api=True` or `False` overrides
-the version's default.
+the version's default, and `page_size_param="limit"` imitates a server that pages by
+`limit`.

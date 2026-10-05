@@ -81,6 +81,9 @@ class FakeBioTime(PersonnelData):
     #: Address used in next links, to check clients do not follow the host.
     internal_base: str = "http://127.0.0.1:8081"
     default_page_size: int = 10
+    #: The query parameter the page size is read from. Set it to "limit" to imitate a
+    #: server that pages by limit, as the 8.0 and 9.0 manuals describe.
+    page_size_param: str = "page_size"
     #: Lifetime of the JSON Web Tokens it issues.
     jwt_lifetime: float = 3600.0
     #: Sort orders it honours for transactions; others are ignored, as on a real server.
@@ -296,7 +299,7 @@ class FakeBioTime(PersonnelData):
     ) -> httpx.Response:
         try:
             page = max(1, int(params.get("page", "1")))
-            size = max(1, int(params.get("page_size", str(self.default_page_size))))
+            size = max(1, int(params.get(self.page_size_param, str(self.default_page_size))))
         except ValueError:
             return _detail(404, "Invalid page.")
         start = (page - 1) * size

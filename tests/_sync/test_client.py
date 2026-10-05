@@ -143,6 +143,16 @@ class TestPagination:
         assert count == 9
         assert {r.params.get("page_size") for r in fake.requests if r.method == "GET"} == {"1"}
 
+    def test_a_server_that_pages_by_limit(self, fake: FakeBioTime) -> None:
+        fake.page_size_param = "limit"
+        with client_for(fake) as client:
+            pages = [page for page in client.transactions.list(page_size=20).pages()]
+            first = client.transactions.list().first()
+        assert [len(p.items) for p in pages] == [20, 5]
+        assert first is not None
+        sizes = [r.params.get("limit") for r in fake.requests if r.method == "GET"]
+        assert sizes == ["20", "20", "1"]
+
 
 class TestTransactions:
     def test_filters(self, fake: FakeBioTime) -> None:

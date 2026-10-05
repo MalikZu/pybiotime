@@ -151,6 +151,17 @@ class TestPagination:
         assert count == 9
         assert {r.params.get("page_size") for r in fake.requests if r.method == "GET"} == {"1"}
 
+    @pytest.mark.anyio
+    async def test_a_server_that_pages_by_limit(self, fake: FakeBioTime) -> None:
+        fake.page_size_param = "limit"
+        async with client_for(fake) as client:
+            pages = [page async for page in client.transactions.list(page_size=20).pages()]
+            first = await client.transactions.list().first()
+        assert [len(p.items) for p in pages] == [20, 5]
+        assert first is not None
+        sizes = [r.params.get("limit") for r in fake.requests if r.method == "GET"]
+        assert sizes == ["20", "20", "1"]
+
 
 class TestTransactions:
     @pytest.mark.anyio
