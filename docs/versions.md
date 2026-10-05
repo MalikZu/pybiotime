@@ -10,8 +10,8 @@ tell it which version you have.
 | 8.5 | Built from the vendor manual; not yet tested live |
 | 8.0 | Built from the vendor manual and reports from live 8.x servers |
 
-If you run 8.x or 9.0, running the [live tests](contributing.md) against your server
-and reporting the result helps a lot.
+If you run 8.x or 9.0, running the [live tests](contributing.md) against your server,
+with `BIOTIME_VERSION` set to its version, and reporting the result helps a lot.
 
 ## What differs, and what pybiotime does about it
 

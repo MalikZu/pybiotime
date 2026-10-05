@@ -25,6 +25,8 @@ Tests against a real BioTime server are opt-in. Set these variables to run them:
 - `BIOTIME_URL`, for example `http://10.0.0.5:8090`
 - `BIOTIME_TOKEN`, or `BIOTIME_USERNAME` and `BIOTIME_PASSWORD`
 - `BIOTIME_TIMEZONE` (optional), for example `Asia/Dubai`
+- `BIOTIME_VERSION` (optional), for example `9.0`: your server's version. The tests then
+  check that `server_info()` does not name another one.
 
 ```bash
 uv run pytest tests/contract
@@ -33,6 +35,8 @@ uv run pytest tests/contract
 One test writes: it creates a department, area, position and employee with codes that
 start with `PYBT`, changes them, then deletes them. It runs only with
 `BIOTIME_WRITE_TESTS=1`. Never point it at a production server.
+
+Resign tests skip themselves when the server has no resign API.
 
 ## Sync and async code
 

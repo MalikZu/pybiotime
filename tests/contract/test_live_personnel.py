@@ -13,7 +13,14 @@ from datetime import date, timedelta
 
 import pytest
 
-from pybiotime import APIError, BioTimeClient, BioTimeError, NotFoundError, ResignType
+from pybiotime import (
+    APIError,
+    BioTimeClient,
+    BioTimeError,
+    NotFoundError,
+    ResignType,
+    ServerInfo,
+)
 from tests.contract.test_live import URL, live_auth
 
 pytestmark = pytest.mark.skipif(not URL, reason="BIOTIME_URL is not set")
@@ -28,6 +35,11 @@ def client() -> Iterator[BioTimeClient]:
     assert URL
     with BioTimeClient(URL, auth=live_auth(), page_size=200) as live:
         yield live
+
+
+@pytest.fixture(scope="module")
+def info(client: BioTimeClient) -> ServerInfo:
+    return client.server_info()
 
 
 @pytest.mark.parametrize("resource", ["departments", "areas", "positions"])
@@ -50,7 +62,9 @@ def test_every_employee_parses_and_is_found_by_code(client: BioTimeClient) -> No
         assert found.id == employee.id
 
 
-def test_resigns_read(client: BioTimeClient) -> None:
+def test_resigns_read(client: BioTimeClient, info: ServerInfo) -> None:
+    if not info.has_resigns:
+        pytest.skip("this server has no resign API, or did not say")
     for resign in client.resigns.list():
         assert client.resigns.get(resign.id).id == resign.id
 
@@ -58,7 +72,7 @@ def test_resigns_read(client: BioTimeClient) -> None:
 @pytest.mark.skipif(
     os.environ.get("BIOTIME_WRITE_TESTS") != "1", reason="BIOTIME_WRITE_TESTS is not 1"
 )
-def test_round_trip(client: BioTimeClient) -> None:
+def test_round_trip(client: BioTimeClient, info: ServerInfo) -> None:
     tag = "PYBT" + secrets.token_hex(3).upper()
     # A code to rename to. Clean-up looks for both, in case a rename sticks.
     other = tag + "X"
@@ -105,19 +119,23 @@ def test_round_trip(client: BioTimeClient) -> None:
             assert getattr(manager.update(item.id, code=other), field) == other
             assert getattr(manager.update(item.id, code=tag), field) == tag
 
-        resign = client.resigns.create(
-            emp.id, resign_date=date.today(), resign_type=ResignType.QUIT, reason="pybiotime test"
-        )
-        resign_ids.append(resign.id)
-        assert resign.employee.id == emp.id
-        # An update sends only some fields. The others must keep their values.
-        earlier = date.today() - timedelta(days=1)
-        moved = client.resigns.update(resign.id, resign_date=earlier)
-        assert moved.resign_date == earlier
-        assert moved.resign_type == ResignType.QUIT
-        assert moved.disableatt is True
-        client.resigns.reinstate([resign.id])
-        assert all(r.id != resign.id for r in client.resigns.list(employee_id=emp.id))
+        if info.has_resigns:
+            resign = client.resigns.create(
+                emp.id,
+                resign_date=date.today(),
+                resign_type=ResignType.QUIT,
+                reason="pybiotime test",
+            )
+            resign_ids.append(resign.id)
+            assert resign.employee.id == emp.id
+            # An update sends only some fields. The others must keep their values.
+            earlier = date.today() - timedelta(days=1)
+            moved = client.resigns.update(resign.id, resign_date=earlier)
+            assert moved.resign_date == earlier
+            assert moved.resign_type == ResignType.QUIT
+            assert moved.disableatt is True
+            client.resigns.reinstate([resign.id])
+            assert all(r.id != resign.id for r in client.resigns.list(employee_id=emp.id))
     finally:
         left = clean_up(client, (tag, other), employee_ids, resign_ids)
         assert not left, f"Delete these test records by hand: {left}"
