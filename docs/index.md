@@ -6,8 +6,8 @@ A typed Python client for the ZKTeco BioTime REST API.
     pybiotime is not affiliated with or endorsed by ZKTeco.
     BioTime is a trademark of its owner.
 
-!!! note "Status: early development"
-    Nothing is published yet. The interface may change without notice.
+!!! note "Status: alpha"
+    The interface may change before 1.0.
 
 ## What it does
 

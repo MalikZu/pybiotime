@@ -2,9 +2,23 @@
 
 Typed Python client for the ZKTeco BioTime REST API.
 
-> **Status: early development.** Nothing is published yet.
+> **Status: alpha.** The interface may change before 1.0.
 >
 > pybiotime is an unofficial project. It is not affiliated with or endorsed by ZKTeco.
+
+```bash
+pip install pybiotime
+```
+
+```python
+from pybiotime import BioTimeClient, TokenAuth
+
+with BioTimeClient("http://10.0.0.5:8090", auth=TokenAuth("api_user", "secret")) as bt:
+    for punch in bt.transactions.list(emp_code="1001"):
+        print(punch.punch_time, punch.punch_state)
+```
+
+Documentation: https://malikzu.github.io/pybiotime/
 
 ## What it does
 

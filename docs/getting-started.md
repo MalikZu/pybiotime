@@ -2,11 +2,11 @@
 
 ## Install
 
-pybiotime is not on PyPI yet. Once it is:
-
 ```bash
 pip install pybiotime
 ```
+
+Or `uv add pybiotime` in a uv project.
 
 It needs Python 3.10 or newer, and installs `httpx` and `pydantic`. On Windows it also
 installs `tzdata`, because Windows has no timezone database of its own.
