@@ -52,6 +52,11 @@ them. It answers writes with related objects as bare ids, and never sends back
   imitate a server that ignores more.
 - An HTML page with HTTP 200 for unknown paths.
 
+## Older BioTime versions
+
+`FakeBioTime(version="8.0")`, `"8.5"` or `"9.0"` answers in that version's shape. See
+[BioTime versions](versions.md#testing-against-older-versions).
+
 ## Useful knobs
 
 - `fake.requests` lists every request received, for assertions.
