@@ -69,7 +69,8 @@ class RecordedRequest:
     params: dict[str, str]
     authorization: str | None
     json: Any = None
-    accept: str | None = None
+    #: The request's Accept header. Left out of comparisons, so older assertions hold.
+    accept: str | None = field(default=None, compare=False)
 
 
 @dataclass
