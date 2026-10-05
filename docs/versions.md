@@ -26,6 +26,8 @@ and reporting the result helps a lot.
   `FaultPageError`, because the server answers with an HTML "Page not found" page.
 - **Page size.** Servers take `page_size`; the 9.0 manual documents `limit`. pybiotime
   sends both, and servers ignore the one they do not know.
+- **No temperature check.** The 8.0 and 9.0 manuals say devices that do not check
+  temperatures or masks send 255 for them. Both read as `None`.
 - **Loose types.** Numbers come as strings, booleans as `0`/`1`, `"Yes"`/`"No"` or `"-"`,
   and empty text as `""` or `null`. Models accept all of these.
 - **Password hashes.** 8.x returns employees' self-service password as a hash; 9.5 leaves

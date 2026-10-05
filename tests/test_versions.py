@@ -172,7 +172,8 @@ def test_secrets_stay_out_of_repr(version: str) -> None:
 
 @pytest.mark.parametrize(
     ("version", "mask", "temperature"),
-    [("8.0", None, 0.0), ("8.5", False, 36.5), ("9.0", None, 255.0), ("9.5", None, 0.0)],
+    # 9.0 sends 255 for both when the device does not check them: not a reading.
+    [("8.0", None, 0.0), ("8.5", False, 36.5), ("9.0", None, None), ("9.5", None, 0.0)],
 )
 def test_mask_and_temperature(version: str, mask: bool | None, temperature: float) -> None:
     punch = Transaction.model_validate(payloads(version)["transactions"][0])
