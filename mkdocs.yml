@@ -31,6 +31,7 @@ nav:
   - Authentication: authentication.md
   - Reading punches: punches.md
   - Employees and structure: personnel.md
+  - Command line: cli.md
   - Errors: errors.md
   - BioTime versions: versions.md
   - Testing your code: testing.md

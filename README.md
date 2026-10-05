@@ -15,6 +15,7 @@ Typed Python client for the ZKTeco BioTime REST API.
 - Reads new punches without losing late uploads from offline devices.
 - Automatic pagination, typed models and clear errors.
 - An in-memory fake server for testing code that uses pybiotime.
+- A `pybiotime` command for exports and scheduled punch collection.
 - Python 3.10 to 3.14. Depends only on `httpx` and `pydantic` (plus `tzdata` on Windows).
 
 ## Contributing
