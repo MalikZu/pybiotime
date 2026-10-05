@@ -8,6 +8,8 @@ from typing import Any
 
 import httpx
 
+from pybiotime.compat import _FLAT_ATTENDANCE, _RELATION_NAMES
+
 _FORMAT = "%Y-%m-%d %H:%M:%S"
 _ROOT = "/personnel/api/"
 
@@ -36,11 +38,28 @@ _FIXED_ON_UPDATE = {"departments": "dept_code", "employees": "emp_code"}
 # Employee fields that can be written but are never read back, as on BioTime 9.5.
 _WRITE_ONLY = ("self_password", "flow_role")
 
-#: Versions the fake can imitate, with what differs between them.
-VERSIONS = ("8.0", "8.5", "9.0", "9.5")
-_WITH_RESIGNS = ("8.5", "9.5")
-#: BioTime 8.x sends the attendance flags at the top level of an employee.
-_FLAT = ("8.0", "8.5")
+
+@dataclass(frozen=True)
+class _Profile:
+    """What the fake changes to imitate one BioTime version, as its manual shows it."""
+
+    #: Title of the public ``/api/docs/`` page.
+    docs_title: str
+    #: 8.x: flat attendance flags, names beside relations and a password hash on
+    #: employees.
+    flat: bool
+    #: Whether the manual documents the resign API.
+    resign_api: bool
+
+
+_PROFILES = {
+    "8.0": _Profile("BIOTIME API DOCS", flat=True, resign_api=False),
+    "8.5": _Profile("BIOTIME API DOCS", flat=True, resign_api=True),
+    "9.0": _Profile("ZKBio Time API DOCS", flat=False, resign_api=False),
+    "9.5": _Profile("BioTime 9.5 API DOCS", flat=False, resign_api=True),
+}
+#: Versions the fake can imitate.
+VERSIONS = tuple(_PROFILES)
 
 _EMPLOYEE_TEXT = (
     "first_name",
@@ -74,11 +93,21 @@ class PersonnelData:
     creates_without_id: set[str] = field(default_factory=lambda: {"positions"})
     #: The BioTime version to imitate: "8.0", "8.5", "9.0" or "9.5".
     version: str = "9.5"
+    #: Whether the resign API answers. ``None`` follows the version: the 8.5 and 9.5
+    #: manuals document it. Set it to imitate a server that differs from its manual.
+    resign_api: bool | None = None
 
     @property
     def has_resigns(self) -> bool:
-        """Whether this version has the resign API (8.5 and 9.5 do)."""
-        return self.version in _WITH_RESIGNS
+        """Whether the resign API answers on this fake."""
+        return self._profile.resign_api if self.resign_api is None else self.resign_api
+
+    @property
+    def _profile(self) -> _Profile:
+        try:
+            return _PROFILES[self.version]
+        except KeyError:
+            raise ValueError(f"version must be one of {', '.join(VERSIONS)}") from None
 
     def _new_id(self) -> int:
         raise NotImplementedError
@@ -320,7 +349,7 @@ class PersonnelData:
         rendered.update(
             {k: v for k, v in row.items() if k not in rendered and k not in _WRITE_ONLY}
         )
-        if self.version in _FLAT:
+        if self._profile.flat:
             return _as_8x(rendered)
         return rendered
 
@@ -360,12 +389,11 @@ def _as_8x(employee: dict[str, Any]) -> dict[str, Any]:
     flags = employee.pop("attemployee")
     for key in ("format_name", "full_name", "photo", "update_time"):
         employee.pop(key, None)
-    employee["enable_att"] = flags["enable_attendance"]
-    employee["enable_overtime"] = flags["enable_overtime"]
-    employee["enable_holiday"] = flags["enable_holiday"]
-    department, position = employee.get("department"), employee.get("position")
-    employee["dept_name"] = department["dept_name"] if department else None
-    employee["position_name"] = position["position_name"] if position else None
+    for flat, nested in _FLAT_ATTENDANCE.items():
+        employee[flat] = flags[nested]
+    for relation, key in _RELATION_NAMES.items():
+        ref = employee.get(relation)
+        employee[key] = ref[key] if ref else None
     employee["area_name"] = ",".join(area["area_name"] for area in employee.get("area", []))
     # 8.x also returns the self-service password, as a hash.
     employee["self_password"] = "pbkdf2_sha256$36000$fake-hash"  # noqa: S105 - not a secret

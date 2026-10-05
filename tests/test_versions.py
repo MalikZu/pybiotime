@@ -24,8 +24,8 @@ from pybiotime.models import (
     Terminal,
     Transaction,
 )
+from pybiotime.testing import VERSIONS
 
-VERSIONS = ["8.0", "8.5", "9.0", "9.5"]
 FIXTURES = Path(__file__).parent / "fixtures" / "versions"
 
 

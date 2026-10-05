@@ -34,12 +34,6 @@ from pybiotime.testing._personnel import VERSIONS, PersonnelData
 __all__ = ["VERSIONS", "FakeBioTime", "RecordedRequest"]
 
 _FORMAT = "%Y-%m-%d %H:%M:%S"
-_DOCS_TITLES = {
-    "8.0": "BIOTIME API DOCS",
-    "8.5": "BIOTIME API DOCS",
-    "9.0": "ZKBio Time API DOCS",
-    "9.5": "BioTime 9.5 API DOCS",
-}
 _NOT_FOUND_PAGE = (
     b"<!DOCTYPE HTML>\n<html>\n<head><title>Page not found</title></head>\n"
     b"<body><h1>Page not found</h1></body>\n</html>\n"
@@ -85,8 +79,7 @@ class FakeBioTime(PersonnelData):
     _next_id: int = 1
 
     def __post_init__(self) -> None:
-        if self.version not in VERSIONS:
-            raise ValueError(f"version must be one of {', '.join(VERSIONS)}")
+        _ = self._profile  # Fails at once on an unknown version.
 
     def transport(self) -> httpx.MockTransport:
         """A transport for `BioTimeClient` or `AsyncBioTimeClient`."""
@@ -196,7 +189,7 @@ class FakeBioTime(PersonnelData):
         if path == "/api/docs/":
             if "html" not in (request.accept or "") and "*/*" not in (request.accept or ""):
                 return _detail(406, "Could not satisfy the request Accept header.")
-            title = _DOCS_TITLES[self.version].encode()
+            title = self._profile.docs_title.encode()
             page = b"<!DOCTYPE html><html><head><title>" + title + b"</title></head></html>"
             return httpx.Response(200, content=page, headers=html)
         unknown = not path.startswith(("/iclock/api/", "/personnel/api/")) or (

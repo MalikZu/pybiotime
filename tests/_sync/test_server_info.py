@@ -4,14 +4,9 @@ import pytest
 
 from pybiotime import BioTimeClient, FaultPageError, TokenAuth
 from pybiotime.testing import VERSIONS, FakeBioTime
+from pybiotime.testing._personnel import _PROFILES
 
 BASE = "http://biotime.test"
-TITLES = {
-    "8.0": "BIOTIME API DOCS",
-    "8.5": "BIOTIME API DOCS",
-    "9.0": "ZKBio Time API DOCS",
-    "9.5": "BioTime 9.5 API DOCS",
-}
 
 
 def client_for(fake: FakeBioTime) -> BioTimeClient:
@@ -28,12 +23,14 @@ def seeded(version: str) -> FakeBioTime:
 
 @pytest.mark.parametrize("version", VERSIONS)
 def test_detects_each_version(version: str) -> None:
-    with client_for(seeded(version)) as client:
+    fake = seeded(version)
+    with client_for(fake) as client:
         info = client.server_info()
+    profile = _PROFILES[version]
     assert info.version == version
-    assert info.docs_title == TITLES[version]
-    assert info.employee_shape == ("flat" if version.startswith("8") else "nested")
-    assert info.has_resigns is (version in ("8.5", "9.5"))
+    assert info.docs_title == profile.docs_title
+    assert info.employee_shape == ("flat" if profile.flat else "nested")
+    assert info.has_resigns is fake.has_resigns
 
 
 @pytest.mark.parametrize(
@@ -46,7 +43,7 @@ def test_without_employees_only_the_title_counts(version: str, expected: str) ->
     assert info.employee_shape is None
 
 
-@pytest.mark.parametrize("version", ["8.0", "9.0"])
+@pytest.mark.parametrize("version", [v for v in VERSIONS if not _PROFILES[v].resign_api])
 def test_resigns_on_a_version_without_them(version: str) -> None:
     with client_for(seeded(version)) as client:
         with pytest.raises(FaultPageError):
@@ -64,3 +61,7 @@ def test_lists_send_limit_beside_page_size() -> None:
 def test_unknown_fake_version() -> None:
     with pytest.raises(ValueError, match="version"):
         FakeBioTime(version="7.0")
+    fake = FakeBioTime()
+    fake.version = "8.x"
+    with pytest.raises(ValueError, match="version"):
+        _ = fake.has_resigns

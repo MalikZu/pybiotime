@@ -63,3 +63,6 @@ from pybiotime.testing import VERSIONS, FakeBioTime
 def fake(request):
     return FakeBioTime(version=request.param)
 ```
+
+Real servers do not always match their manuals. `resign_api=True` or `False` overrides
+the version's default.
