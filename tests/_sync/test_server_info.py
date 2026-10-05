@@ -71,6 +71,35 @@ def test_the_resign_api_does_not_pick_the_version(version: str, expected: str) -
     assert info.version == expected
 
 
+@pytest.mark.parametrize(("status", "expected"), [(403, True), (404, False), (500, None)])
+def test_a_refused_resign_probe_still_gives_an_answer(status: int, expected: bool | None) -> None:
+    fake = seeded("9.5")
+    fake.fail_next(status, path="/personnel/api/resigns/")
+    with client_for(fake) as client:
+        info = client.server_info()
+    # A 403 shows the route exists: this account may just not use it.
+    assert info.has_resigns is expected
+    assert info.version == "9.5"
+
+
+def test_a_refused_employee_probe_leaves_the_shape_unknown() -> None:
+    fake = seeded("9.5")
+    fake.fail_next(403, path="/personnel/api/employees/")
+    with client_for(fake) as client:
+        info = client.server_info()
+    assert info.employee_shape is None
+    assert info.version == "9.5"
+
+
+def test_a_passing_html_page_does_not_mean_no_resign_api() -> None:
+    fake = seeded("8.5")
+    page = b"<html><head><title>Starting</title></head></html>"
+    with client_for(fake, serving(fake, "/personnel/api/resigns/", page)) as client:
+        info = client.server_info()
+    assert info.has_resigns is None
+    assert info.version == "8.x"
+
+
 @pytest.mark.parametrize("version", ["8.0", "9.0"])
 def test_another_page_at_the_docs_path_is_not_a_docs_title(version: str) -> None:
     fake = seeded(version)
@@ -79,6 +108,28 @@ def test_another_page_at_the_docs_path_is_not_a_docs_title(version: str) -> None
         info = client.server_info()
     assert info.docs_title is None
     assert info.version == EXPECTED[version]
+
+
+def test_an_unreachable_docs_page_leaves_the_title_unknown() -> None:
+    fake = seeded("9.5")
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/docs/":
+            raise httpx.ConnectError("refused", request=request)
+        return fake.handle(request)
+
+    with client_for(fake, httpx.MockTransport(handle)) as client:
+        info = client.server_info()
+    assert info.docs_title is None
+    assert info.employee_shape == "nested"
+
+
+def test_probes_send_limit_beside_page_size() -> None:
+    fake = seeded("9.5")
+    with client_for(fake) as client:
+        client.server_info()
+    probes = [r.params for r in fake.requests if r.path.startswith("/personnel/api/")]
+    assert probes == [{"page_size": "1", "limit": "1"}] * 2
 
 
 @pytest.mark.parametrize("version", [v for v in VERSIONS if not _PROFILES[v].resign_api])

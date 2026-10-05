@@ -41,7 +41,7 @@ No endpoint reports the version. `server_info()` reads three signals:
 ```python
 info = bt.server_info()
 info.version  # "9.5" from the docs title, "8.x" for flat employees, otherwise None
-info.has_resigns  # whether the resign API exists
+info.has_resigns  # True, False, or None when the server's answer did not tell
 info.employee_shape  # "flat" (8.x) or "nested"; None without employees
 info.docs_title  # title of the public /api/docs/ page, or None
 ```
@@ -50,6 +50,9 @@ The signals are the title of the public API docs page, the shape of one employee
 whether the resign endpoint answers. `version` gives a number only when the docs title
 shows one: some 8.x servers nest employees as 9.x does, and the resign API is not tied
 to one version. To decide what to call, check `has_resigns` directly.
+
+A signal is `None` when its request fails. Authentication and connection errors on the
+API requests still raise.
 
 ## Testing against older versions
 

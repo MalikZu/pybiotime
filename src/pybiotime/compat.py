@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from pybiotime.errors import FaultPageError, LicenseError, NotFoundError, PermissionDeniedError
+
 __all__ = [
     "EmployeeShape",
     "ServerInfo",
@@ -38,10 +40,10 @@ class ServerInfo:
     #: Title of the public API docs page, if the server serves one.
     docs_title: str | None
     #: "flat" (8.x) or "nested" (9.x and later 8.x builds) attendance flags; ``None``
-    #: without employees.
+    #: without employees, or when the server refused to list them.
     employee_shape: EmployeeShape | None
-    #: Whether the resign API exists. BioTime 8.5 and 9.5 have it.
-    has_resigns: bool
+    #: Whether the resign API answers; ``None`` when the server's answer did not tell.
+    has_resigns: bool | None
 
 
 # BioTime 8.x sends these at the top level of an employee.
@@ -173,3 +175,20 @@ def guess_version(title: str | None, shape: EmployeeShape | None) -> str | None:
         if number:
             return number.group(1)
     return "8.x" if shape == "flat" else None
+
+
+def resign_api_from_error(error: Exception) -> bool | None:
+    """What a failed request for the resign list says about the resign API.
+
+    ``False`` for a 404, or for the "Page not found" page BioTime sends for unknown
+    paths. ``True`` when the server refuses this account, since the route then exists.
+    ``None`` otherwise, for example for a server error or another page sent while the
+    server restarts.
+    """
+    if isinstance(error, NotFoundError):
+        return False
+    if isinstance(error, FaultPageError):
+        return False if "not found" in error.snippet.lower() else None
+    if isinstance(error, PermissionDeniedError) and not isinstance(error, LicenseError):
+        return True
+    return None
