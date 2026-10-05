@@ -18,7 +18,7 @@ from pybiotime import (
     TokenAuth,
     TransportError,
 )
-from pybiotime.testing import FakeBioTime
+from pybiotime.testing import FakeBioTime, RecordedRequest
 
 BASE = "http://biotime.test"
 
@@ -152,6 +152,15 @@ class TestPagination:
         assert first is not None
         sizes = [r.params.get("limit") for r in fake.requests if r.method == "GET"]
         assert sizes == ["20", "20", "1"]
+
+    def test_recorded_requests_compare_without_accept(self, fake: FakeBioTime) -> None:
+        with client_for(fake) as client:
+            client.request("GET", "/iclock/api/terminals/")
+        last = fake.requests[-1]
+        assert last.accept is not None
+        assert last == RecordedRequest(
+            "GET", last.host, last.path, last.params, last.authorization, last.json
+        )
 
 
 class TestTransactions:

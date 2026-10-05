@@ -61,7 +61,9 @@ the 9.5 shape. See [BioTime versions](versions.md#testing-against-older-versions
 
 ## Useful knobs
 
-- `fake.requests` lists every request received, for assertions.
+- `fake.requests` lists every request received, for assertions. List requests carry both
+  `page_size` and `limit`. Each record's `accept` holds the Accept header; it is left out
+  when records are compared.
 - `fake.fail_next(503, path="/iclock/")` answers the next matching request with an error.
 - `fake.tokens.clear()` makes the server reject the current token.
 - `upload_time=` on `add_transaction` imitates a device that uploads late.
