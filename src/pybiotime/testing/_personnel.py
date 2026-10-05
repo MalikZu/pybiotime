@@ -46,16 +46,28 @@ class _Profile:
     #: Title of the public ``/api/docs/`` page.
     docs_title: str
     #: 8.x: flat attendance flags, names beside relations and a password hash on
-    #: employees.
+    #: employees; departments give their parent as an id, with its name beside it.
     flat: bool
     #: Whether the manual documents the resign API.
     resign_api: bool
+    #: The self-service password hash in employee write answers (and in 8.x reads).
+    password_hash: str | None = None
+    #: ZKBio Time 9.0's punches: no names or labels, and sync fields of their own.
+    zkbio_transactions: bool = False
 
 
+_HASH_8X = "pbkdf2_sha256$36000$fake-hash"
+_HASH_9X = "pbkdf2_sha256$390000$fake-hash"
 _PROFILES = {
-    "8.0": _Profile("BIOTIME API DOCS", flat=True, resign_api=False),
-    "8.5": _Profile("BIOTIME API DOCS", flat=True, resign_api=True),
-    "9.0": _Profile("ZKBio Time API DOCS", flat=False, resign_api=False),
+    "8.0": _Profile("BIOTIME API DOCS", flat=True, resign_api=False, password_hash=_HASH_8X),
+    "8.5": _Profile("BIOTIME API DOCS", flat=True, resign_api=True, password_hash=_HASH_8X),
+    "9.0": _Profile(
+        "ZKBio Time API DOCS",
+        flat=False,
+        resign_api=False,
+        password_hash=_HASH_9X,
+        zkbio_transactions=True,
+    ),
     "9.5": _Profile("BioTime 9.5 API DOCS", flat=False, resign_api=True),
 }
 #: Versions the fake can imitate.
@@ -227,7 +239,22 @@ class PersonnelData:
         if kind == "resigns":
             return httpx.Response(status, json=self._render(kind, row))
         # Other write answers give relations as bare ids, as the vendor manuals show.
-        return httpx.Response(status, json={k: v for k, v in row.items() if k not in _WRITE_ONLY})
+        answer = {k: v for k, v in row.items() if k not in _WRITE_ONLY}
+        if kind == "employees":
+            answer = self._employee_answer(answer)
+        return httpx.Response(status, json=answer)
+
+    def _employee_answer(self, answer: dict[str, Any]) -> dict[str, Any]:
+        """Add what this version's manual shows in employee write answers."""
+        profile = self._profile
+        if profile.flat:
+            answer.pop("update_time", None)
+            for flag in _FLAT_ATTENDANCE:
+                answer.setdefault(flag, True)
+        if profile.password_hash:
+            answer["self_password"] = profile.password_hash
+            answer["flow_role"] = []
+        return answer
 
     def _validate(
         self, kind: str, data: dict[str, Any], current: dict[str, Any] | None, sent: set[str]
@@ -281,7 +308,7 @@ class PersonnelData:
         self.resigns = [r for r in self.resigns if r["id"] not in ids]
         return httpx.Response(200, json={"code": 0, "msg": "", "data": []})
 
-    # --- rendering, in the BioTime 9.5 shape -------------------------------------------
+    # --- rendering, in the BioTime 9.5 shape unless `version` says otherwise ----------
 
     def _render(self, kind: str, row: dict[str, Any]) -> dict[str, Any]:
         if kind in _CODED:
@@ -301,6 +328,11 @@ class PersonnelData:
         }
         if depth:
             rendered[spec.parent] = parent_id
+            return rendered
+        if kind == "departments" and self._profile.flat:
+            # 8.x gives the parent department as an id, with its name beside it.
+            rendered[spec.parent] = parent["id"] if parent else None
+            rendered["parent_dept_name"] = parent[spec.name] if parent else None
             return rendered
         rendered[spec.parent] = self._render_coded(kind, parent, depth + 1) if parent else None
         if spec.parent_name:
@@ -350,7 +382,7 @@ class PersonnelData:
             {k: v for k, v in row.items() if k not in rendered and k not in _WRITE_ONLY}
         )
         if self._profile.flat:
-            return _as_8x(rendered)
+            return _as_8x(rendered, self._profile.password_hash)
         return rendered
 
     def _render_resign(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -384,7 +416,7 @@ def _shown(value: Any) -> str:
     return str(value)
 
 
-def _as_8x(employee: dict[str, Any]) -> dict[str, Any]:
+def _as_8x(employee: dict[str, Any], password_hash: str | None) -> dict[str, Any]:
     """Reshape a 9.x employee the way BioTime 8.x sends it."""
     flags = employee.pop("attemployee")
     for key in ("format_name", "full_name", "photo", "update_time"):
@@ -397,5 +429,5 @@ def _as_8x(employee: dict[str, Any]) -> dict[str, Any]:
         employee[key] = ref[key] if ref else None
     employee["area_name"] = ",".join(area["area_name"] for area in employee.get("area", []))
     # 8.x also returns the self-service password, as a hash.
-    employee["self_password"] = "pbkdf2_sha256$36000$fake-hash"  # noqa: S105 - not a secret
+    employee["self_password"] = password_hash
     return employee

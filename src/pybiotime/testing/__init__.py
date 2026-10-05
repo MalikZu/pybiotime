@@ -3,7 +3,8 @@
 `FakeBioTime` answers like a BioTime 9.5 server, including its quirks: next links that
 point at an internal host, sort orders it ignores, HTML pages for unknown paths and
 400 for rejected logins. Pass `version="8.0"`, `"8.5"` or `"9.0"` to imitate an older
-server: employees, the API docs page and the resign API change to match.
+server as its manual shows it: employees, 8.x departments, 9.0 punches, the API docs
+page and the resign API change to match.
 `after_request` lets a test change the data between requests, as new punches do on a
 live server. Plug it into either client:
 
@@ -34,6 +35,26 @@ from pybiotime.testing._personnel import VERSIONS, PersonnelData
 __all__ = ["VERSIONS", "FakeBioTime", "RecordedRequest"]
 
 _FORMAT = "%Y-%m-%d %H:%M:%S"
+# ZKBio Time 9.0 punches leave these out, and carry the fields below instead.
+_NOT_IN_ZKBIO = (
+    "first_name",
+    "last_name",
+    "department",
+    "position",
+    "punch_state_display",
+    "verify_type_display",
+)
+_ZKBIO_FIELDS = {
+    "terminal": None,
+    "is_attendance": 1,
+    "mobile": None,
+    "purpose": 9,
+    "source": 1,
+    "sync_status": 0,
+    "sync_time": None,
+    "crc": None,
+    "reserved": None,
+}
 _NOT_FOUND_PAGE = (
     b"<!DOCTYPE HTML>\n<html>\n<head><title>Page not found</title></head>\n"
     b"<body><h1>Page not found</h1></body>\n</html>\n"
@@ -212,12 +233,11 @@ class FakeBioTime(PersonnelData):
             return self._list(path, params, self._filter_terminals(params))
         if path == "/iclock/api/transactions/":
             return self._transactions(path, params)
-        for prefix, rows in (
-            ("/iclock/api/terminals/", self.terminals),
-            ("/iclock/api/transactions/", self.transactions),
-        ):
-            if path.startswith(prefix):
-                return _detail_object(rows, path[len(prefix) :].strip("/"))
+        if path.startswith("/iclock/api/terminals/"):
+            return _detail_object(self.terminals, path[len("/iclock/api/terminals/") :])
+        if path.startswith("/iclock/api/transactions/"):
+            rows = [self._render_transaction(r) for r in self.transactions]
+            return _detail_object(rows, path[len("/iclock/api/transactions/") :])
         return _detail(404, "Not found.")
 
     def _login(self, method: str, path: str, body: Any) -> httpx.Response:
@@ -264,7 +284,12 @@ class FakeBioTime(PersonnelData):
             field_name = order.lstrip("-")
             # Ties fall back to id order, reversed for descending sorts, as the real server does.
             rows.sort(key=lambda r: (r[field_name], r["id"]), reverse=order.startswith("-"))
-        return self._list(path, params, rows)
+        return self._list(path, params, [self._render_transaction(r) for r in rows])
+
+    def _render_transaction(self, row: dict[str, Any]) -> dict[str, Any]:
+        if not self._profile.zkbio_transactions:
+            return row
+        return {**_ZKBIO_FIELDS, **{k: v for k, v in row.items() if k not in _NOT_IN_ZKBIO}}
 
     def _list(
         self, path: str, params: dict[str, str], rows: list[dict[str, Any]]
@@ -303,6 +328,7 @@ def _detail(status: int, message: str) -> httpx.Response:
 
 
 def _detail_object(rows: list[dict[str, Any]], key: str) -> httpx.Response:
+    key = key.strip("/")
     for row in rows:
         if str(row["id"]) == key:
             return httpx.Response(200, json=row)

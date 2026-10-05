@@ -40,8 +40,9 @@ The fake checks what a real server checks: required fields, unique codes, and id
 that must exist. Failures raise `BadRequestError` with `field_errors`, as on a real server.
 
 Like BioTime 9.5, it keeps department and employee codes when an update tries to change
-them. It answers writes with related objects as bare ids, and never sends back
-`self_password` or `flow_role`.
+them, and answers writes with related objects as bare ids. By default it never sends back
+`self_password` or `flow_role`. Older versions add them where their manuals do: 8.x
+employees carry a password hash, and 8.x and 9.0 write answers carry it too.
 
 ## What it imitates
 
@@ -54,8 +55,9 @@ them. It answers writes with related objects as bare ids, and never sends back
 
 ## Older BioTime versions
 
-`FakeBioTime(version="8.0")`, `"8.5"` or `"9.0"` answers in that version's shape. See
-[BioTime versions](versions.md#testing-against-older-versions).
+`FakeBioTime(version="8.0")`, `"8.5"` or `"9.0"` answers as that version's manual shows
+employees, departments, punches, the API docs page and the resign API. Other records keep
+the 9.5 shape. See [BioTime versions](versions.md#testing-against-older-versions).
 
 ## Useful knobs
 

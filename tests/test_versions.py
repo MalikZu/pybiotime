@@ -11,6 +11,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 
 from pybiotime.compat import docs_title, employee_shape, guess_version
@@ -24,7 +25,8 @@ from pybiotime.models import (
     Terminal,
     Transaction,
 )
-from pybiotime.testing import VERSIONS
+from pybiotime.testing import VERSIONS, FakeBioTime
+from pybiotime.testing._personnel import _PROFILES
 
 FIXTURES = Path(__file__).parent / "fixtures" / "versions"
 
@@ -189,6 +191,20 @@ def test_custom_attributes_are_kept(version: str) -> None:
         assert custom in employee.extra
     for moved in ("attemployee", "enable_att", "dept_name", "area_name", "position_name"):
         assert moved not in employee.extra
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_fake_punches_carry_the_version_fields(version: str) -> None:
+    fake = FakeBioTime(version=version)
+    fake.tokens.add("token")
+    fake.add_transaction(emp_code="1001", punch_time=datetime(2026, 7, 28, 8, 0))
+    url = "http://biotime.test/iclock/api/transactions/"
+    answer = fake.handle(httpx.Request("GET", url, headers={"Authorization": "Token token"}))
+    sent = set(answer.json()["data"][0])
+    fields = set(payloads(version)["transactions"][0])
+    assert fields <= sent
+    if _PROFILES[version].zkbio_transactions:
+        assert sent == fields
 
 
 class TestVersionSignals:
