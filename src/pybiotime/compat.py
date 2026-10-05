@@ -12,11 +12,34 @@ from __future__ import annotations
 
 import html
 import re
+from dataclasses import dataclass
 from typing import Any, Literal
 
-__all__ = ["EmployeeShape", "docs_title", "employee_shape", "guess_version", "normalize_employee"]
+__all__ = [
+    "EmployeeShape",
+    "ServerInfo",
+    "docs_title",
+    "employee_shape",
+    "guess_version",
+    "normalize_employee",
+]
 
 EmployeeShape = Literal["nested", "flat"]
+
+
+@dataclass(frozen=True)
+class ServerInfo:
+    """What a BioTime server shows about itself. See `BioTimeClient.server_info`."""
+
+    #: Best guess, such as "9.5", or "8.x" when only the generation is clear.
+    version: str | None
+    #: Title of the public API docs page, if the server serves one.
+    docs_title: str | None
+    #: "nested" (9.x) or "flat" (8.x) attendance flags; ``None`` without employees.
+    employee_shape: EmployeeShape | None
+    #: Whether the resign API exists. BioTime 8.5 and 9.5 have it.
+    has_resigns: bool
+
 
 # BioTime 8.x sends these at the top level of an employee.
 _FLAT_ATTENDANCE = {

@@ -4,6 +4,7 @@ from pybiotime._async import AsyncBioTimeClient, AsyncPager
 from pybiotime._sync import BioTimeClient, Pager
 from pybiotime._version import __version__
 from pybiotime.auth import BasicAuth, JWTAuth, StaffJWTAuth, StaffTokenAuth, TokenAuth
+from pybiotime.compat import ServerInfo
 from pybiotime.enums import (
     DevicePrivilege,
     EmploymentType,
@@ -69,6 +70,7 @@ __all__ = [
     "ResignType",
     "ResponseShapeError",
     "ServerError",
+    "ServerInfo",
     "StaffJWTAuth",
     "StaffTokenAuth",
     "Terminal",
