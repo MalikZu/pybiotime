@@ -28,6 +28,9 @@ dependencies = [
     "tzdata>=2023.3; sys_platform == 'win32'",
 ]
 
+[project.scripts]
+pybiotime = "pybiotime.cli:main"
+
 [project.urls]
 Source = "https://github.com/MalikZu/pybiotime"
 Issues = "https://github.com/MalikZu/pybiotime/issues"
