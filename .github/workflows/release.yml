@@ -1,0 +1,92 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 publishes that commit to PyPI and makes a GitHub release.
+# The package version is read from the tag. PyPI trusts this workflow through Trusted
+# Publishing, so no API token is stored anywhere. See docs/contributing.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The version comes from the tag, which needs the git history.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Check the tag is a release version
+        run: |
+          if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not like v1.2.3 or v1.2.3rc1"
+            exit 1
+          fi
+      - name: Check the tag is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::Tag $GITHUB_REF_NAME is not on main"
+            exit 1
+          }
+      - run: uv sync --locked
+      - run: uv run pytest
+      - run: uv build
+      - name: Check the built version matches the tag
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          ls dist
+          test -f "dist/pybiotime-${expected}-py3-none-any.whl"
+          test -f "dist/pybiotime-${expected}.tar.gz"
+      - name: Smoke-test the wheel in a clean environment
+        run: |
+          installed=$(uv run --isolated --no-project --with dist/*.whl \
+            python -c "import pybiotime; print(pybiotime.__version__)")
+          test "$installed" = "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pybiotime/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github:
+    name: GitHub release
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Create the release with notes from the merged pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          [[ "$GITHUB_REF_NAME" =~ (a|b|rc)[0-9]+$ ]] && prerelease="--prerelease"
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "pybiotime ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag $prerelease
