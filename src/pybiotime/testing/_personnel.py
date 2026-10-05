@@ -36,6 +36,12 @@ _FIXED_ON_UPDATE = {"departments": "dept_code", "employees": "emp_code"}
 # Employee fields that can be written but are never read back, as on BioTime 9.5.
 _WRITE_ONLY = ("self_password", "flow_role")
 
+#: Versions the fake can imitate, with what differs between them.
+VERSIONS = ("8.0", "8.5", "9.0", "9.5")
+_WITH_RESIGNS = ("8.5", "9.5")
+#: BioTime 8.x sends the attendance flags at the top level of an employee.
+_FLAT = ("8.0", "8.5")
+
 _EMPLOYEE_TEXT = (
     "first_name",
     "last_name",
@@ -66,6 +72,13 @@ class PersonnelData:
     #: Collections whose create answers echo the submitted fields without the new id.
     #: BioTime 9.5 does this for positions.
     creates_without_id: set[str] = field(default_factory=lambda: {"positions"})
+    #: The BioTime version to imitate: "8.0", "8.5", "9.0" or "9.5".
+    version: str = "9.5"
+
+    @property
+    def has_resigns(self) -> bool:
+        """Whether this version has the resign API (8.5 and 9.5 do)."""
+        return self.version in _WITH_RESIGNS
 
     def _new_id(self) -> int:
         raise NotImplementedError
@@ -307,6 +320,8 @@ class PersonnelData:
         rendered.update(
             {k: v for k, v in row.items() if k not in rendered and k not in _WRITE_ONLY}
         )
+        if self.version in _FLAT:
+            return _as_8x(rendered)
         return rendered
 
     def _render_resign(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -338,3 +353,20 @@ def _shown(value: Any) -> str:
     if isinstance(value, dict):
         value = value.get("id")
     return str(value)
+
+
+def _as_8x(employee: dict[str, Any]) -> dict[str, Any]:
+    """Reshape a 9.x employee the way BioTime 8.x sends it."""
+    flags = employee.pop("attemployee")
+    for key in ("format_name", "full_name", "photo", "update_time"):
+        employee.pop(key, None)
+    employee["enable_att"] = flags["enable_attendance"]
+    employee["enable_overtime"] = flags["enable_overtime"]
+    employee["enable_holiday"] = flags["enable_holiday"]
+    department, position = employee.get("department"), employee.get("position")
+    employee["dept_name"] = department["dept_name"] if department else None
+    employee["position_name"] = position["position_name"] if position else None
+    employee["area_name"] = ",".join(area["area_name"] for area in employee.get("area", []))
+    # 8.x also returns the self-service password, as a hash.
+    employee["self_password"] = "pbkdf2_sha256$36000$fake-hash"  # noqa: S105 - not a secret
+    return employee
