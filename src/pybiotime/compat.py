@@ -118,6 +118,15 @@ def _fold(data: dict[str, Any], relation: str, key: str, name: Any) -> None:
         data[relation] = {"id": ref, key: name}
 
 
+def page_params(size: int) -> dict[str, str]:
+    """Query parameters asking for `size` objects per page.
+
+    BioTime takes ``page_size``; the 8.0 and 9.0 manuals document ``limit`` instead.
+    Servers ignore parameters they do not know, so both are sent.
+    """
+    return {"page_size": str(size), "limit": str(size)}
+
+
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 _VERSION = re.compile(r"\b(\d+\.\d+)\b")
 

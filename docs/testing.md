@@ -67,6 +67,7 @@ the 9.5 shape. See [BioTime versions](versions.md#testing-against-older-versions
 - `upload_time=` on `add_transaction` imitates a device that uploads late.
 - `fake.resign_api = True` (or `False`) makes the resign API answer (or not), whatever
   the version.
+- `fake.page_size_param = "limit"` imitates a server that pages by `limit`.
 - `fake.creates_without_id` lists the collections whose creates answer without the new id.
   It defaults to `{"positions"}`, as BioTime 9.5 does.
 - `fake.after_request` is called with each request after it is answered. Use it to add
