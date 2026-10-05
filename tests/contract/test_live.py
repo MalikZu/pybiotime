@@ -1,7 +1,8 @@
 """Read-only checks against a real BioTime server. Skipped unless configured.
 
 Set BIOTIME_URL, and either BIOTIME_TOKEN or BIOTIME_USERNAME and BIOTIME_PASSWORD.
-Optionally set BIOTIME_TIMEZONE. These tests never write to the server.
+Optionally set BIOTIME_TIMEZONE, and BIOTIME_VERSION to check version detection.
+These tests never write to the server.
 """
 
 import os
@@ -78,3 +79,11 @@ def test_read_new_twice(client: BioTimeClient) -> None:
 def test_unknown_path_is_a_fault_page(client: BioTimeClient) -> None:
     with pytest.raises(FaultPageError):
         client.request("GET", "/personnel/api/no-such-endpoint/")
+
+
+def test_server_info(client: BioTimeClient) -> None:
+    info = client.server_info()
+    assert info.version is not None
+    expected = os.environ.get("BIOTIME_VERSION")
+    if expected:
+        assert info.version == expected
