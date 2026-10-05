@@ -2,8 +2,10 @@
 
 `FakeBioTime` answers like a BioTime 9.5 server, including its quirks: next links that
 point at an internal host, sort orders it ignores, HTML pages for unknown paths and
-400 for rejected logins. `after_request` lets a test change the data between requests,
-as new punches do on a live server. Plug it into either client:
+400 for rejected logins. Pass `version="8.0"`, `"8.5"` or `"9.0"` to imitate an older
+server: employees, the API docs page and the resign API change to match.
+`after_request` lets a test change the data between requests, as new punches do on a
+live server. Plug it into either client:
 
     fake = FakeBioTime(username="api", password="secret")
     fake.add_terminal(sn="TEST0000001", alias="Main gate")
@@ -27,11 +29,17 @@ from urllib.parse import urlencode
 
 import httpx
 
-from pybiotime.testing._personnel import PersonnelData
+from pybiotime.testing._personnel import VERSIONS, PersonnelData
 
-__all__ = ["FakeBioTime", "RecordedRequest"]
+__all__ = ["VERSIONS", "FakeBioTime", "RecordedRequest"]
 
 _FORMAT = "%Y-%m-%d %H:%M:%S"
+_DOCS_TITLES = {
+    "8.0": "BIOTIME API DOCS",
+    "8.5": "BIOTIME API DOCS",
+    "9.0": "ZKBio Time API DOCS",
+    "9.5": "BioTime 9.5 API DOCS",
+}
 _NOT_FOUND_PAGE = (
     b"<!DOCTYPE HTML>\n<html>\n<head><title>Page not found</title></head>\n"
     b"<body><h1>Page not found</h1></body>\n</html>\n"
@@ -74,6 +82,10 @@ class FakeBioTime(PersonnelData):
     #: requests, for example to add punches while a client is paging.
     after_request: Callable[[RecordedRequest], None] | None = None
     _next_id: int = 1
+
+    def __post_init__(self) -> None:
+        if self.version not in VERSIONS:
+            raise ValueError(f"version must be one of {', '.join(VERSIONS)}")
 
     def transport(self) -> httpx.MockTransport:
         """A transport for `BioTimeClient` or `AsyncBioTimeClient`."""
@@ -178,8 +190,15 @@ class FakeBioTime(PersonnelData):
 
         if path in ("/api-token-auth/", "/jwt-api-token-auth/"):
             return self._login(request.method, path, request.json)
-        if not path.startswith(("/iclock/api/", "/personnel/api/")):
-            html = {"Content-Type": "text/html"}
+        html = {"Content-Type": "text/html"}
+        if path == "/api/docs/":
+            title = _DOCS_TITLES[self.version].encode()
+            page = b"<!DOCTYPE html><html><head><title>" + title + b"</title></head></html>"
+            return httpx.Response(200, content=page, headers=html)
+        unknown = not path.startswith(("/iclock/api/", "/personnel/api/")) or (
+            path.startswith("/personnel/api/resigns/") and not self.has_resigns
+        )
+        if unknown:
             return httpx.Response(200, content=_NOT_FOUND_PAGE, headers=html)
 
         if not authorization:
