@@ -82,7 +82,13 @@ def employee_view(e: Employee) -> tuple[Any, ...]:
 def coded_view(item: Department | Area | Position) -> tuple[Any, ...]:
     if isinstance(item, Department):
         parent = item.parent_dept
-        return (item.id, item.dept_code, item.dept_name, parent.id if parent else None)
+        return (
+            item.id,
+            item.dept_code,
+            item.dept_name,
+            parent.id if parent else None,
+            parent.dept_name if parent else None,
+        )
     if isinstance(item, Area):
         parent_area = item.parent_area
         return (item.id, item.area_code, item.area_name, parent_area.id if parent_area else None)
@@ -142,7 +148,7 @@ def test_the_shared_records() -> None:
     )
     assert employee[10] == date(2026, 10, 1)
     assert employee[14] == (True, False, True)
-    assert data["departments"] == [(3, "OPS", "Operations", 2)]
+    assert data["departments"] == [(3, "OPS", "Operations", 2, "Head office")]
     assert data["areas"] == [(2, "WH", "Warehouse", 1)]
 
 

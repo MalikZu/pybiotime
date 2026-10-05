@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from pybiotime.compat import normalize_employee
+from pybiotime.compat import normalize_department, normalize_employee
 from pybiotime.models._base import (
     BioTimeModel,
     LenientBool,
@@ -22,6 +22,11 @@ class Department(BioTimeModel):
     dept_code: str
     dept_name: str
     parent_dept: DepartmentRef | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _smooth_versions(cls, data: Any) -> Any:
+        return normalize_department(data)
 
 
 class Area(BioTimeModel):

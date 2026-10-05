@@ -21,6 +21,7 @@ __all__ = [
     "docs_title",
     "employee_shape",
     "guess_version",
+    "normalize_department",
     "normalize_employee",
 ]
 
@@ -77,16 +78,22 @@ def normalize_employee(data: Any) -> Any:
     return data
 
 
+def normalize_department(data: Any) -> Any:
+    """Move BioTime 8.x's ``parent_dept_name`` into the ``parent_dept`` reference.
+
+    8.x sends the parent as an id with its name beside it; 9.x expands the parent.
+    """
+    if not isinstance(data, dict) or "parent_dept_name" not in data:
+        return data
+    data = dict(data)
+    _fold(data, "parent_dept", "dept_name", data.pop("parent_dept_name"))
+    return data
+
+
 def _fold_names(data: dict[str, Any]) -> None:
     for relation, key in _RELATION_NAMES.items():
-        if key not in data:
-            continue
-        name = data.pop(key)
-        ref = data.get(relation)
-        if isinstance(ref, dict):
-            data[relation] = {key: name, **ref}
-        elif ref is not None:
-            data[relation] = {"id": ref, key: name}
+        if key in data:
+            _fold(data, relation, key, data.pop(key))
 
     areas, names = data.get("area"), data.get("area_name")
     if not isinstance(areas, list) or "area_name" not in data:
@@ -100,6 +107,15 @@ def _fold_names(data: dict[str, Any]) -> None:
             {"id": area, "area_name": name}
             for area, name in zip(areas, names.split(","), strict=True)
         ]
+
+
+def _fold(data: dict[str, Any], relation: str, key: str, name: Any) -> None:
+    """Put `name` under `key` in the `relation` reference, keeping a name it already has."""
+    ref = data.get(relation)
+    if isinstance(ref, dict):
+        data[relation] = {key: name, **ref}
+    elif ref is not None:
+        data[relation] = {"id": ref, key: name}
 
 
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)

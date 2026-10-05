@@ -20,6 +20,8 @@ and reporting the result helps a lot.
   `employee.attendance`.
 - **Names beside relations.** 8.x sends `dept_name`, `position_name` and `area_name` next
   to the ids. They move into `employee.department`, `employee.position` and `employee.area`.
+  8.x departments give their parent as an id with `parent_dept_name`; it moves into
+  `department.parent_dept`.
 - **The resign API** exists on 8.5 and 9.5 only. On other versions, resign calls raise
   `FaultPageError`, because the server answers with an HTML "Page not found" page.
 - **Page size.** Servers take `page_size`; the 9.0 manual documents `limit`. pybiotime
