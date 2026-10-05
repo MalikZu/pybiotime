@@ -66,3 +66,34 @@ Keep each commit to one change.
 ```bash
 uv run --group docs mkdocs serve
 ```
+
+## Releasing
+
+A release is a pushed tag. The version comes from the tag, so nothing in the code
+changes. Commits on `main` follow Conventional Commits, which keeps the release notes
+readable: they list the pull requests merged since the last tag.
+
+1. Check that CI on `main` is green.
+2. Pick the version: a `fix` since the last release means a patch, a `feat` a minor
+   version. Before 1.0, breaking changes also go in a minor version.
+3. Tag `main` and push the tag:
+
+    ```bash
+    git switch main && git pull
+    git tag -a v0.1.0 -m "pybiotime 0.1.0"
+    git push origin v0.1.0
+    ```
+
+The Release workflow then checks that the tag is on `main`, runs the tests, builds the
+package, checks that its version matches the tag, publishes it to PyPI and creates a
+GitHub release. A tag such as `v0.2.0rc1` makes a pre-release.
+
+### One-time setup
+
+PyPI trusts the workflow through Trusted Publishing, so no API token is stored:
+
+- On PyPI, add a trusted publisher for the project `pybiotime`: owner `MalikZu`,
+  repository `pybiotime`, workflow `release.yml`, environment `pypi`. Before the first
+  release, add it as a pending publisher from your account's publishing page.
+- On GitHub, create an environment named `pypi` under Settings → Environments. Add
+  yourself as a required reviewer to approve each upload by hand.

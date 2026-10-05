@@ -1,6 +1,7 @@
 [project]
 name = "pybiotime"
-version = "0.0.0"
+# Set from the git tag at build time, so a release is just a pushed tag.
+dynamic = ["version"]
 description = "Unofficial typed Python client for the ZKTeco BioTime REST API."
 readme = "README.md"
 license = "MIT"
@@ -8,7 +9,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.10"
 keywords = ["biotime", "zkteco", "attendance", "time-attendance", "biometric", "api-client"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -50,8 +51,13 @@ docs = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.26"]
+requires = ["hatchling>=1.26", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+# Used where there is no git history, such as an exported source tree.
+fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.sdist]
 include = ["src/pybiotime", "tests", "LICENSE", "README.md"]

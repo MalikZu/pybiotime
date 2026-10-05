@@ -1092,7 +1092,6 @@ wheels = [
 
 [[package]]
 name = "pybiotime"
-version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
