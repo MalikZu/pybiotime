@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from pybiotime._concurrency import Lock, sleep
-from pybiotime._core import decode_response, parse_page, resolve_timezone
+from pybiotime._core import decode_response, resolve_timezone
 from pybiotime._sync.personnel import (
     Areas,
     Departments,
@@ -24,13 +24,18 @@ from pybiotime._sync.personnel import (
 from pybiotime._sync.resources import Terminals, Transactions
 from pybiotime._version import __version__
 from pybiotime.auth import Auth
-from pybiotime.compat import ServerInfo, docs_title, employee_shape, guess_version
+from pybiotime.compat import (
+    ServerInfo,
+    docs_title,
+    employee_shape,
+    guess_version,
+    resign_api_from_error,
+)
 from pybiotime.errors import (
     APIError,
     AuthenticationError,
-    FaultPageError,
+    BioTimeError,
     LoginSuspendedError,
-    NotFoundError,
     TransportError,
 )
 
@@ -129,23 +134,35 @@ class BioTimeClient:
 
         No endpoint reports the version, so this reads three signals: the title of the
         public ``/api/docs/`` page, how one employee's attendance flags are shaped, and
-        whether the resign endpoint answers. It makes three small requests.
+        whether the resign endpoint answers. A signal is ``None`` when its request does
+        not tell; only authentication and connection errors on the API requests raise.
+        It makes three small requests, plus a login when the client has no token yet.
         """
         title = None
-        # The docs page is HTML only: asked for JSON, it answers 406.
-        page = self._send("GET", "/api/docs/", auth=None, accept="text/html")
-        if page.status_code == 200:
+        try:
+            # The docs page is HTML only: asked for JSON, it answers 406.
+            page = self._send("GET", "/api/docs/", auth=None, accept="text/html")
+        except TransportError:
+            page = None
+        if page is not None and page.status_code == 200:
             title = docs_title(page.text)
 
-        body = self._request("GET", self.employees.path, params={"page_size": "1"})
-        items = parse_page(body, method="GET", path=self.employees.path).items
-        shape = employee_shape(items[0]) if items else None
-
         try:
-            self._request("GET", self.resigns.path, params={"page_size": "1"})
+            items = (self.employees.list()._small_page()).items
+            shape = employee_shape(items[0]) if items else None
+        except (AuthenticationError, TransportError):
+            raise
+        except BioTimeError:
+            shape = None
+
+        has_resigns: bool | None
+        try:
+            self.resigns.list()._small_page()
             has_resigns = True
-        except (FaultPageError, NotFoundError):
-            has_resigns = False
+        except (AuthenticationError, TransportError):
+            raise
+        except BioTimeError as exc:
+            has_resigns = resign_api_from_error(exc)
 
         return ServerInfo(
             version=guess_version(title, shape),
