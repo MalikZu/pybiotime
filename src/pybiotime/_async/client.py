@@ -20,6 +20,7 @@ from pybiotime._async.personnel import (
 from pybiotime._async.resources import AsyncTerminals, AsyncTransactions
 from pybiotime._concurrency import AsyncLock, async_sleep
 from pybiotime._core import decode_response, resolve_timezone
+from pybiotime._secret import secret_token
 from pybiotime._version import __version__
 from pybiotime.auth import Auth
 from pybiotime.compat import (
@@ -211,12 +212,15 @@ class AsyncBioTimeClient:
             )
         response = await self._send("POST", path, json=self.auth.login_body(), auth=None)
         try:
-            body = decode_response(
-                response.status_code,
-                response.headers.get("content-type", ""),
-                response.content,
-                method="POST",
-                path=path,
+            # The answer holds the token. Wrapped at once, it stays out of tracebacks.
+            answer = secret_token(
+                decode_response(
+                    response.status_code,
+                    response.headers.get("content-type", ""),
+                    response.content,
+                    method="POST",
+                    path=path,
+                )
             )
         except APIError as exc:
             # Bad credentials come back as 400, not 401.
@@ -231,7 +235,7 @@ class AsyncBioTimeClient:
                     body=exc.body,
                 ) from None
             raise
-        self.auth.accept_login(body)
+        self.auth.accept_login(answer)
         logger.debug("logged in via %s", path)
 
     async def _send(
@@ -250,6 +254,7 @@ class AsyncBioTimeClient:
         attempt = 0
         while True:
             started = time.monotonic()
+            failure = None
             try:
                 response = await self._http.request(
                     method, path, params=params, json=json, headers=headers
@@ -260,7 +265,12 @@ class AsyncBioTimeClient:
                     logger.debug("%s %s failed (%s), retry %d", method, path, exc, attempt)
                     await async_sleep(_backoff(attempt))
                     continue
-                raise TransportError(f"{method} {path} failed: {exc!r}") from exc
+                failure = f"{method} {path} failed: {exc!r}"
+            if failure is not None:
+                # Raised outside the except block, so httpx's exception is not chained.
+                # Its traceback runs through httpcore, whose locals hold the raw headers
+                # and body bytes, credentials included.
+                raise TransportError(failure)
 
             elapsed = time.monotonic() - started
             logger.debug("%s %s -> %d in %.2fs", method, path, response.status_code, elapsed)

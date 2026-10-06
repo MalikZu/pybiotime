@@ -4,7 +4,7 @@ Every exception derives from `BioTimeError`.
 
 | Exception | When |
 |---|---|
-| `TransportError` | No response: connection refused, DNS failure, timeout, TLS error. |
+| `TransportError` | No response: connection refused, DNS failure, timeout, TLS error. The message names the underlying httpx error, which is not chained: its traceback holds the raw request headers. |
 | `FaultPageError` | The server sent a non-JSON page, often HTML with HTTP 200. Usually a wrong path or a server that is starting. |
 | `APIError` | Any error response. Has `status_code`, `detail` and `body`. |
 | `AuthenticationError` | HTTP 401, or the login was rejected. |
