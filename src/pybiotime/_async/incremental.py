@@ -49,7 +49,7 @@ async def read_new(
         if punch.upload_time is not None:
             # Keeps the next window moving even when the arrival scan could not run.
             newest = latest(newest, naive(punch.upload_time))
-        if current.is_new(punch.id):
+        if current.is_new_punch(punch):
             found[punch.id] = punch
 
     current.advance(found.values(), newest)
@@ -103,7 +103,7 @@ async def _arrival_scan(
             newest = latest(newest, uploaded)
             if threshold is not None and uploaded < threshold:
                 return newest
-            if state.is_new(punch.id):
+            if state.is_new_punch(punch):
                 found[punch.id] = punch
             elif (
                 previous_newest is not None

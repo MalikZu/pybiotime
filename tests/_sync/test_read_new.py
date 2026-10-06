@@ -215,3 +215,80 @@ def test_empty_server() -> None:
         second = client.transactions.read_new(result.state)
     assert result.transactions == []
     assert len(second.transactions) == 1
+
+
+def restore(fake: FakeBioTime, keep: int) -> None:
+    """Imitate a database restored from a backup that ends at id `keep`.
+
+    Later punches are lost, and the database hands out their ids again.
+    """
+    fake.transactions = [t for t in fake.transactions if t["id"] <= keep]
+    fake._next_id = keep + 1
+
+
+def test_a_small_restore_is_detected() -> None:
+    fake = FakeBioTime()
+    for minute in range(10):
+        punch(fake, minute)
+    with client_for(fake) as client:
+        state = (client.transactions.read_new()).state
+        restore(fake, keep=7)
+        # New punches arrive under the lost ids 8 to 10, well inside the recent span.
+        for minute in range(3):
+            fake.add_transaction(
+                emp_code="2002",
+                punch_time=DAY + timedelta(minutes=20 + minute),
+                upload_time=DAY + timedelta(minutes=30),
+            )
+        with pytest.raises(ReadStateError, match="restored"):
+            client.transactions.read_new(state)
+
+
+def test_a_small_restore_is_detected_without_the_arrival_scan() -> None:
+    fake = FakeBioTime()
+    fake.honoured_orders = {"punch_time", "-punch_time"}
+    now = datetime.now().replace(microsecond=0)
+    for minute in range(10):
+        fake.add_transaction(emp_code="1001", punch_time=now - timedelta(minutes=60 - minute))
+    with client_for(fake) as client:
+        state = (client.transactions.read_new()).state
+        assert state["upload_order"] == "unsupported"
+        restore(fake, keep=7)
+        for minute in range(3):
+            fake.add_transaction(emp_code="2002", punch_time=now - timedelta(minutes=5 - minute))
+        with pytest.raises(ReadStateError, match="restored"):
+            client.transactions.read_new(state)
+
+
+def test_the_same_punches_coming_back_are_not_an_alarm() -> None:
+    fake = FakeBioTime()
+    for minute in range(10):
+        punch(fake, minute)
+    client = BioTimeClient(
+        BASE, auth=TokenAuth("api", "secret"), transport=fake.transport(), timezone="Asia/Dubai"
+    )
+    with client:
+        state = (client.transactions.read_new()).state
+        # Both scans read every punch again; none of them may look changed.
+        again = client.transactions.read_new(state)
+        third = client.transactions.read_new(again.state)
+    assert again.transactions == []
+    assert third.transactions == []
+
+
+def test_a_state_without_fingerprints_learns_them() -> None:
+    fake = FakeBioTime()
+    for minute in range(10):
+        punch(fake, minute)
+    with client_for(fake) as client:
+        state = dict((client.transactions.read_new()).state)
+        del state["fingerprints"]  # as saved by an older pybiotime
+        learned = client.transactions.read_new(state)
+        assert learned.transactions == []
+        assert all(learned.state["fingerprints"])
+        restore(fake, keep=7)
+        fake.add_transaction(
+            emp_code="2002", punch_time=DAY + timedelta(minutes=20), upload_time=DAY
+        )
+        with pytest.raises(ReadStateError, match="restored"):
+            client.transactions.read_new(learned.state)

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from pybiotime.incremental import RECENT_ID_SPAN, ReadState, ReadStateError
@@ -37,3 +39,22 @@ def test_recent_ids_stay_bounded() -> None:
     state.max_id = 4_999
     state.advance([], None)
     assert min(state.recent_ids) == 4_999 - RECENT_ID_SPAN + 1
+
+
+def test_fingerprints_round_trip_beside_recent_ids() -> None:
+    state = ReadState(max_id=50, recent_ids={48, 49, 50}, fingerprints={48: "aa", 50: "cc"})
+    data = state.to_dict()
+    assert data["recent_ids"] == [48, 49, 50]
+    assert data["fingerprints"] == ["aa", None, "cc"]
+    assert ReadState.from_dict(data).fingerprints == {48: "aa", 50: "cc"}
+
+
+def test_fingerprints_that_do_not_line_up_are_ignored() -> None:
+    data = ReadState(max_id=50, recent_ids={49, 50}).to_dict() | {"fingerprints": ["aa"]}
+    assert ReadState.from_dict(data).fingerprints == {}
+
+
+def test_a_full_state_stays_small() -> None:
+    ids = set(range(10_000 - RECENT_ID_SPAN + 1, 10_001))
+    state = ReadState(max_id=10_000, recent_ids=ids, fingerprints=dict.fromkeys(ids, "0a1b2c3d"))
+    assert len(json.dumps(state.to_dict())) < 48_000

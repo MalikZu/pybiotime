@@ -75,5 +75,17 @@ says `"unsupported"`.
 A punch can still come back twice in rare cases. Store punches keyed on the server and
 the `id`, and skip ones you already have.
 
-If the server's database is restored and ids start over, `read_new` raises
-`ReadStateError`. Start again without a state, from a known date.
+### When the server's database is restored
+
+A restored database hands out ids it already used, for new punches. `read_new` notices and
+raises `ReadStateError`, so punches are not skipped as already seen:
+
+- **It remembers a short fingerprint** (who punched, when, and on which device) for each
+  recent id. When a known id comes back as a different punch, that is a restore. The same
+  punch coming back is skipped as usual.
+- **It also spots ids that start over from far below** what it has seen.
+- **States saved by pybiotime 0.1.1 or older** have no fingerprints. They learn them as
+  the scans see those punches again, and check them from then on.
+
+After `ReadStateError`, start again without a state, from a known date, and let your
+storage's `id` key drop the punches you already have.
