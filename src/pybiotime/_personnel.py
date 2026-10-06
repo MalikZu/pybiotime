@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any
 
 from pybiotime._core import DATETIME_FORMAT
+from pybiotime._secret import Secret
 from pybiotime.compat import _FLAT_ATTENDANCE
 from pybiotime.errors import APIError
 from pybiotime.models import Employee
@@ -17,6 +18,9 @@ _RENAMED = {"department_id": "department", "area_ids": "area", "position_id": "p
 
 # Read as a hash (8.x) or not at all (9.5), so it can never be compared.
 _WRITE_ONLY = {"self_password"}
+
+# Sent as `Secret`, so they stay out of tracebacks that show local variables.
+_SECRET_FIELDS = {"device_password", "card_no", "self_password"}
 
 # Employee properties that give the ids behind a relation.
 _IDS = {"department": "department_id", "position": "position_id", "area": "area_ids"}
@@ -47,7 +51,29 @@ def employee_payload(fields: Mapping[str, Any] | None = None, **values: Any) -> 
         body[name] = value
     if fields:
         body.update({key: _wire(value) for key, value in fields.items()})
+    for key in _SECRET_FIELDS & body.keys():
+        if isinstance(body[key], str):
+            body[key] = Secret(body[key])
     return body
+
+
+def hide_secrets(
+    card_no: str | None, device_password: str | None, fields: Mapping[str, Any] | None
+) -> tuple[str | None, str | None, Mapping[str, Any] | None]:
+    """Wrap the caller's secret arguments in `Secret` before anything can fail.
+
+    The write methods rebind their parameters to these, so a traceback that shows
+    local variables shows them redacted.
+    """
+
+    def hide(value: str | None) -> str | None:
+        return Secret(value) if isinstance(value, str) else value
+
+    if fields is not None:
+        fields = {
+            key: hide(value) if key in _SECRET_FIELDS else value for key, value in fields.items()
+        }
+    return hide(card_no), hide(device_password), fields
 
 
 def employee_changes(existing: Employee, desired: Mapping[str, Any]) -> dict[str, Any]:

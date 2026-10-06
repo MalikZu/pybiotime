@@ -22,7 +22,10 @@ Use a BioTime system user made for the integration, with only the permissions it
 
 ## Secrets
 
-Passwords and tokens never appear in `repr()` or in pybiotime's logs.
+Passwords and tokens never appear in `repr()` or in pybiotime's logs. They also stay out
+of tracebacks that list local variables, as Frappe's error logs do: pybiotime holds them,
+and the PINs and card numbers you send for employees, in a string type whose `repr()` is
+redacted.
 
 Some BioTime responses contain secrets too: employee payloads include a password hash
 and the device PIN. Do not log raw responses.

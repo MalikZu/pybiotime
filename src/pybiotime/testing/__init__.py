@@ -78,7 +78,8 @@ class FakeBioTime(PersonnelData):
     """In-memory BioTime server. All state is public so tests can inspect and change it."""
 
     username: str = "api"
-    password: str = "secret"  # noqa: S105 - a fake server's default
+    #: Kept out of repr(), like the issued tokens, so failing tests do not print them.
+    password: str = field(default="secret", repr=False)
     #: Address used in next links, to check clients do not follow the host.
     internal_base: str = "http://127.0.0.1:8081"
     default_page_size: int = 10
@@ -94,7 +95,7 @@ class FakeBioTime(PersonnelData):
     terminals: list[dict[str, Any]] = field(default_factory=list)
     transactions: list[dict[str, Any]] = field(default_factory=list)
     requests: list[RecordedRequest] = field(default_factory=list)
-    tokens: set[str] = field(default_factory=set)
+    tokens: set[str] = field(default_factory=set, repr=False)
     #: Statuses to answer the next matching requests with, before any real handling.
     #: Each entry is ``(method, path_prefix, status)``; it is removed once used.
     failures: list[tuple[str, str, int]] = field(default_factory=list)

@@ -20,6 +20,8 @@ import json
 import time
 from typing import Any, ClassVar
 
+from pybiotime._secret import Secret
+
 __all__ = [
     "Auth",
     "BasicAuth",
@@ -79,15 +81,15 @@ class _LoginAuth(Auth):
     def __init__(self, username: str, password: str) -> None:
         super().__init__()
         self.username = username
-        self._password = password
-        self._token: str | None = None
+        self._password = Secret(password)
+        self._token: Secret | None = None
 
     @property
     def can_login(self) -> bool:
         return True
 
     def authorization(self) -> str | None:
-        return f"{self.scheme} {self._token}" if self._token else None
+        return Secret(f"{self.scheme} {self._token}") if self._token else None
 
     def needs_login(self, rejected: str | None = None) -> bool:
         current = self.authorization()
@@ -100,7 +102,7 @@ class _LoginAuth(Auth):
         token = body.get("token") if isinstance(body, dict) else None
         if not isinstance(token, str) or not token:
             raise ValueError("The login response did not contain a token")
-        self._token = token
+        self._token = Secret(token)
 
     def __repr__(self) -> str:
         token = _REDACTED if self._token else None
@@ -126,7 +128,7 @@ class TokenAuth(_LoginAuth):
         if token is None and (username is None or password is None):
             raise ValueError("Pass a username and password, or a token")
         super().__init__(username or "", password or "")
-        self._token = token
+        self._token = Secret(token) if token is not None else None
         self._static = password is None
 
     @property
@@ -182,7 +184,7 @@ class BasicAuth(Auth):
         super().__init__()
         self.username = username
         credentials = f"{username}:{password}".encode()
-        self._header = "Basic " + base64.b64encode(credentials).decode("ascii")
+        self._header = Secret("Basic " + base64.b64encode(credentials).decode("ascii"))
 
     def authorization(self) -> str | None:
         return self._header

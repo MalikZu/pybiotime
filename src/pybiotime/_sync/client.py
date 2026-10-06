@@ -14,6 +14,7 @@ import httpx
 
 from pybiotime._concurrency import Lock, sleep
 from pybiotime._core import decode_response, resolve_timezone
+from pybiotime._secret import secret_token
 from pybiotime._sync.personnel import (
     Areas,
     Departments,
@@ -213,12 +214,15 @@ class BioTimeClient:
             )
         response = self._send("POST", path, json=self.auth.login_body(), auth=None)
         try:
-            body = decode_response(
-                response.status_code,
-                response.headers.get("content-type", ""),
-                response.content,
-                method="POST",
-                path=path,
+            # The answer holds the token. Wrapped at once, it stays out of tracebacks.
+            answer = secret_token(
+                decode_response(
+                    response.status_code,
+                    response.headers.get("content-type", ""),
+                    response.content,
+                    method="POST",
+                    path=path,
+                )
             )
         except APIError as exc:
             # Bad credentials come back as 400, not 401.
@@ -233,7 +237,7 @@ class BioTimeClient:
                     body=exc.body,
                 ) from None
             raise
-        self.auth.accept_login(body)
+        self.auth.accept_login(answer)
         logger.debug("logged in via %s", path)
 
     def _send(
@@ -252,6 +256,7 @@ class BioTimeClient:
         attempt = 0
         while True:
             started = time.monotonic()
+            failure = None
             try:
                 response = self._http.request(
                     method, path, params=params, json=json, headers=headers
@@ -262,7 +267,12 @@ class BioTimeClient:
                     logger.debug("%s %s failed (%s), retry %d", method, path, exc, attempt)
                     sleep(_backoff(attempt))
                     continue
-                raise TransportError(f"{method} {path} failed: {exc!r}") from exc
+                failure = f"{method} {path} failed: {exc!r}"
+            if failure is not None:
+                # Raised outside the except block, so httpx's exception is not chained.
+                # Its traceback runs through httpcore, whose locals hold the raw headers
+                # and body bytes, credentials included.
+                raise TransportError(failure)
 
             elapsed = time.monotonic() - started
             logger.debug("%s %s -> %d in %.2fs", method, path, response.status_code, elapsed)

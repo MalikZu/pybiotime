@@ -10,6 +10,7 @@ from pybiotime._personnel import (
     code_kept_error,
     employee_changes,
     employee_payload,
+    hide_secrets,
     resign_payload,
 )
 from pybiotime.errors import ResponseShapeError
@@ -249,6 +250,7 @@ class AsyncEmployees:
         fields: Mapping[str, Any] | None = None,
     ) -> Employee:
         """Create an employee. BioTime requires a department and at least one area."""
+        card_no, device_password, fields = hide_secrets(card_no, device_password, fields)
         body = employee_payload(
             emp_code=emp_code,
             department_id=department_id,
@@ -300,6 +302,7 @@ class AsyncEmployees:
         Raises `APIError` if the server keeps the old `emp_code`. BioTime 9.5 does not
         change employee codes.
         """
+        card_no, device_password, fields = hide_secrets(card_no, device_password, fields)
         body = employee_payload(
             emp_code=emp_code,
             department_id=department_id,
@@ -356,6 +359,7 @@ class AsyncEmployees:
         arguments leave the existing value alone. Fields the server does not send back,
         such as ``self_password``, are set only when the employee is created.
         """
+        card_no, device_password, fields = hide_secrets(card_no, device_password, fields)
         desired = employee_payload(
             emp_code=emp_code,
             department_id=department_id,
